@@ -1,25 +1,25 @@
-# Task Manager Microservices 🚀
+ Task Manager Microservices 
 
-## Architecture
+ Architecture
 - Auth Service (JWT + Refresh Tokens)
 - Task Service (CRUD + Dashboard)
 - API Gateway (Routing)
 - Service Registry (Eureka)
 
-## Features
+ Features
 - JWT Authentication
 - Role-Based Access (ADMIN / USER)
 - Refresh Tokens
 - Dashboard APIs
 - Validation & Exception Handling
 
-## Tech Stack
+ Tech Stack
 - Spring Boot
 - Spring Security
 - Spring Cloud (Eureka, Gateway)
 - H2 Database
 
-## Run Order
+ Run Order
 1. service-registry
 2. auth-service
 3. task-service
