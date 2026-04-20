@@ -13,7 +13,7 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil) throws Exception {
-
+			
 	    http
 	        .csrf(AbstractHttpConfigurer::disable)
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable())) // 
