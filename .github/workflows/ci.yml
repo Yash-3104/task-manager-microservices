@@ -55,25 +55,25 @@ jobs:
     - name: Start services
       run: docker compose up -d
 
-    - name: Wait for services to register in Eureka
+    - name: Wait for API Gateway to be ready
       run: |
-       for i in {1..20}; do
-       echo "Checking service registration..."
+        for i in {1..20}; do
+          echo "Checking API Gateway..."
 
-       auth=$(curl -s http://localhost:8761/eureka/apps | grep "AUTH-SERVICE" || true)
-       task=$(curl -s http://localhost:8761/eureka/apps | grep "TASK-SERVICE" || true)
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/register)
 
-       if [ ! -z "$auth" ] && [ ! -z "$task" ]; then
-        echo "All services registered!"
-        exit 0
-       fi
+          if [ "$status" -eq 200 ] || [ "$status" -eq 405 ]; then
+            echo "Gateway is ready!"
+            exit 0
+          fi
 
-       echo "Waiting for services..."
-        sleep 5
+          echo "Still not ready (status: $status)..."
+          sleep 5
         done
 
-       echo "Services did not register in time"
-       exit 1
+        echo "Gateway not ready in time"
+        docker compose logs
+        exit 1
 
     - name: Setup Node
       uses: actions/setup-node@v4
