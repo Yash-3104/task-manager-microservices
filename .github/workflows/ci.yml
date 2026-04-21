@@ -49,18 +49,17 @@ jobs:
         docker build -t task-manager-gateway ./api-gateway
         docker build -t task-manager-registry ./service-registry
 
-    - name: Build services
-       run: docker compose build
+    - name: Build services (compose)
+      run: docker compose build
 
     - name: Start services
-       run: docker compose up -d
+      run: docker compose up -d
 
     - name: Wait for services
       run: sleep 60
 
     - name: Check if API is up
-      run: |
-        curl -f http://localhost:8090 || exit 1
+      run: curl -f http://localhost:8090 || exit 1
 
     - name: Setup Node
       uses: actions/setup-node@v4
@@ -71,8 +70,7 @@ jobs:
       run: npm install -g newman
 
     - name: Run Postman tests
-      run: |
-        newman run postman_collection.json -e postman_environment.json
+      run: newman run postman_collection.json -e postman_environment.json
 
     - name: Stop services
       run: docker compose down
