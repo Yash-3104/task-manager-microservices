@@ -60,7 +60,7 @@ jobs:
         for i in {1..20}; do
           echo "Checking API Gateway..."
 
-          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/register)
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/register || echo "000")
 
           if [ "$status" -eq 200 ] || [ "$status" -eq 405 ]; then
             echo "Gateway is ready!"
