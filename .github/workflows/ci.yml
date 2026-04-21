@@ -57,21 +57,21 @@ jobs:
 
     - name: Wait for API Gateway to be ready
       run: |
-        for i in {1..20}; do
-          echo "Checking API Gateway..."
+        for i in {1..30}; do
+          echo "Checking full routing (Gateway → Auth Service)..."
 
-          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/register || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/login || echo "000")
 
-          if [ "$status" -eq 200 ] || [ "$status" -eq 405 ]; then
-            echo "Gateway is ready!"
+          if [ "$response" -eq 400 ] || [ "$response" -eq 405 ]; then
+            echo "Gateway routing is fully ready!"
             exit 0
           fi
 
-          echo "Still not ready (status: $status)..."
+          echo "Still not ready (status: $response)..."
           sleep 5
         done
 
-        echo "Gateway not ready in time"
+        echo "System not ready in time"
         docker compose logs
         exit 1
 
