@@ -55,12 +55,21 @@ jobs:
     - name: Start services
       run: docker compose up -d
 
-    - name: Wait for services
+    - name: Wait for services to register in Eureka
       run: |
-        for i in {1..12}; do
-          curl -f http://localhost:8761 && break
-          echo "Waiting for services..."
-          sleep 5
+       for i in {1..20}; do
+       echo "Checking service registration..."
+
+       auth=$(curl -s http://localhost:8761/eureka/apps | grep "AUTH-SERVICE")
+       task=$(curl -s http://localhost:8761/eureka/apps | grep "TASK-SERVICE")
+
+       if [ ! -z "$auth" ] && [ ! -z "$task" ]; then
+        echo "All services registered!"
+        break
+       fi
+
+       echo "Waiting..."
+       sleep 5
         done
 
     - name: Setup Node
