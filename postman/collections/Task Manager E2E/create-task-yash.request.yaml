@@ -1,0 +1,27 @@
+$kind: http-request
+name: create-task-yash
+url: "{{baseUrl}}/api/tasks"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Yash Task\",\r
+
+    \  \"description\": \"Only for yash\",\r
+
+    \  \"status\": \"TODO\",\r
+
+    \  \"priority\": \"HIGH\",\r
+
+    \  \"startDate\": \"2026-04-12\",\r
+
+    \  \"dueDate\": \"2026-04-15\"\r
+
+    }"
+auth:
+  credentials:
+    - key: token
+      value: token_yash
+  type: bearer
+order: 4494978241355025

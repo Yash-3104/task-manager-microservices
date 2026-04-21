@@ -1,0 +1,20 @@
+$kind: http-request
+name: login-yash
+url: "{{baseUrl}}/api/auth/login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"username\": \"yash\",\r
+
+    \  \"password\": \"123\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "const json = pm.response.json();\r
+
+      pm.environment.set(\"token_yash\", json.accessToken);"
+    language: text/javascript
+order: 4393678390958402
