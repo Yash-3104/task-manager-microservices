@@ -49,8 +49,11 @@ jobs:
         docker build -t task-manager-gateway ./api-gateway
         docker build -t task-manager-registry ./service-registry
 
+    - name: Build services
+       run: docker compose build
+
     - name: Start services
-      run: docker-compose up -d
+       run: docker compose up -d
 
     - name: Wait for services
       run: sleep 60
@@ -72,7 +75,7 @@ jobs:
         newman run postman_collection.json -e postman_environment.json
 
     - name: Stop services
-      run: docker-compose down
+      run: docker compose down
 
     - name: Login to DockerHub
       uses: docker/login-action@v3
