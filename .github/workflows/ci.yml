@@ -55,23 +55,29 @@ jobs:
     - name: Start services
       run: docker compose up -d
 
-    - name: Wait for API Gateway to be ready
+    - name: Wait for system readiness
       run: |
-        for i in {1..30}; do
-          echo "Checking full routing (Gateway → Auth Service)..."
+        for i in {1..40}; do
+          echo "Checking full system readiness..."
 
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/login || echo "000")
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:8090/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"test","password":"test"}' \
+            || echo "000")
 
-          if [ "$response" -eq 400 ] || [ "$response" -eq 405 ]; then
-            echo "Gateway routing is fully ready!"
+          echo "Status: $status"
+
+          # ✅ READY CONDITIONS
+          if [ "$status" -eq 200 ] || [ "$status" -eq 400 ] || [ "$status" -eq 401 ]; then
+            echo "System is READY ✅"
             exit 0
           fi
 
-          echo "Still not ready (status: $response)..."
           sleep 5
         done
 
-        echo "System not ready in time"
+        echo "System NOT ready ❌"
         docker compose logs
         exit 1
 
