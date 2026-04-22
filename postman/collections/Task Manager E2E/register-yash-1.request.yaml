@@ -1,0 +1,16 @@
+$kind: http-request
+name: register-yash
+url: "{{baseUrl}}/api/auth/register"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"username\": \"yash\",\r
+
+    \  \"password\": \"123\",\r
+
+    \  \"role\": \"USER\"\r
+
+    }"
+order: 3449028731051787

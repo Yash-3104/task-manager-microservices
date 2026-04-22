@@ -1,0 +1,26 @@
+$kind: http-request
+name: create-task-rahul
+url: "{{baseUrl}}/api/tasks"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Rahul Task\",\r
+
+    \  \"description\": \"Only for rahul\",\r
+
+    \  \"status\": \"TODO\",\r
+
+    \  \"priority\": \"LOW\",\r
+
+    \  \"startDate\": \"2026-04-12\",\r
+
+    \  \"dueDate\": \"2026-04-15\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: token_rahul
+order: 4502583793366493

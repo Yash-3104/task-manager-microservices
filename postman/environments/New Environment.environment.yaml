@@ -1,0 +1,14 @@
+name: New Environment
+values:
+  - key: baseUrl
+    enabled: true
+    value: ''
+  - key: token_yash
+    enabled: true
+    value: ''
+  - key: token_rahul
+    enabled: true
+    value: ''
+  - key: token_admin
+    enabled: true
+    value: ''
