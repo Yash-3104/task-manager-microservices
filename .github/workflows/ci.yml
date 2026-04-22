@@ -1,116 +1,118 @@
-name: CI/CD Pipeline
+  name: CI/CD Pipeline
 
-on:
-  push:
-    branches:
-      - main
-      - feature/*
-  pull_request:
-    branches:
-      - main
+  on:
+    push:
+      branches:
+        - main
+        - feature/*
+    pull_request:
+      branches:
+        - main
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+  jobs:
+    build:
+      runs-on: ubuntu-latest
 
-    steps:
+      steps:
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
-    - name: Build auth-service
-      run: cd auth-service && mvn clean install
+      - name: Build auth-service
+        run: cd auth-service && mvn clean install
 
-    - name: Build task-service
-      run: cd task-service && mvn clean install
+      - name: Build task-service
+        run: cd task-service && mvn clean install
 
-    - name: Build api-gateway
-      run: cd api-gateway && mvn clean install
+      - name: Build api-gateway
+        run: cd api-gateway && mvn clean install
 
-    - name: Build service-registry
-      run: cd service-registry && mvn clean install
+      - name: Build service-registry
+        run: cd service-registry && mvn clean install
 
-    - name: Build Docker images
-      run: |
-        docker build -t task-manager-auth ./auth-service
-        docker build -t task-manager-task ./task-service
-        docker build -t task-manager-gateway ./api-gateway
-        docker build -t task-manager-registry ./service-registry
+      - name: Build Docker images
+        run: |
+          docker build -t task-manager-auth ./auth-service
+          docker build -t task-manager-task ./task-service
+          docker build -t task-manager-gateway ./api-gateway
+          docker build -t task-manager-registry ./service-registry
 
-    - name: Build services (compose)
-      run: docker compose build
+      - name: Build services (compose)
+        run: docker compose build
 
-    - name: Start services
-      run: docker compose up -d
+      - name: Start services
+        run: docker compose up -d
 
-    - name: Wait for system readiness
-      run: |
-        for i in {1..40}; do
-          echo "Checking full system readiness..."
+      - name: Wait for system readiness
+        run: |
+          for i in {1..40}; do
+            echo "Checking full system readiness..."
 
-          status=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST http://localhost:8090/api/auth/login \
-            -H "Content-Type: application/json" \
-            -d '{"username":"test","password":"test"}' \
-            || echo "000")
+            auth_status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST http://localhost:8090/api/auth/login \
+              -H "Content-Type: application/json" \
+              -d '{"username":"test","password":"test"}' \
+              || echo "000")
 
-          echo "Status: $status"
+            task_status=$(curl -s -o /dev/null -w "%{http_code}" \
+             http://localhost:8090/api/tasks/dashboard || echo "000")
 
-          # ✅ READY CONDITIONS
-          if [ "$status" -eq 200 ] || [ "$status" -eq 400 ] || [ "$status" -eq 401 ]; then
-            echo "System is READY ✅"
-            exit 0
-          fi
+            echo "Auth: $auth_status | Task: $task_status"
 
-          sleep 5
-        done
+            if [[ "$auth_status" =~ ^(200|400|401)$ ]] && [[ "$task_status" =~ ^(200|403)$ ]]; then
+              echo "System is READY ✅"
+              exit 0
+            fi
 
-        echo "System NOT ready ❌"
-        docker compose logs
-        exit 1
+            sleep 5
+          done
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
+          echo "System NOT ready ❌"
+          docker compose logs
+          exit 1
 
-    - name: Install Newman
-      run: npm install -g newman
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    - name: Run Postman tests
-      run: newman run postman_collection.json -e postman_environment.json
+      - name: Install Newman
+        run: npm install -g newman
 
-    - name: Stop services
-      run: docker compose down
+      - name: Run Postman tests
+        run: newman run postman_collection.json -e postman_environment.json
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Stop services
+        run: docker compose down
 
-    - name: Push Docker images
-      run: |
-        docker tag task-manager-auth ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-        docker tag task-manager-task ${{ secrets.DOCKER_USERNAME }}/task-manager-task
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
+      - name: Push Docker images
+        run: |
+          docker tag task-manager-auth ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
 
-        docker tag task-manager-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+          docker tag task-manager-task ${{ secrets.DOCKER_USERNAME }}/task-manager-task
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
 
-        docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+          docker tag task-manager-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+
+          docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
