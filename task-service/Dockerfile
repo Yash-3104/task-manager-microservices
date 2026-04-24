@@ -4,4 +4,4 @@ WORKDIR /app
 
 COPY target/*.jar app.jar
 
-ENTRYPOINT ["java","-Djava.net.preferIPv4Stack=true","-jar","sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT sh -c "java $JAVA_OPTS -Djava.net.preferIPv4Stack=true -jar app.jar --spring.profiles.active=docker"
