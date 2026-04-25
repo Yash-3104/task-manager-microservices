@@ -13,7 +13,6 @@ jobs:
 build:
 runs-on: ubuntu-latest
 
-```
 steps:
   - name: Checkout code
     uses: actions/checkout@v4
@@ -145,4 +144,3 @@ steps:
 
       docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
       docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
-```
