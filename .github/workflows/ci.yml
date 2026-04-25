@@ -13,6 +13,7 @@ jobs:
 build:
 runs-on: ubuntu-latest
 
+```
 steps:
   - name: Checkout code
     uses: actions/checkout@v4
@@ -29,6 +30,8 @@ steps:
       path: ~/.m2
       key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
+  # -------- BUILD --------
+
   - name: Build auth-service
     run: mvn -f auth-service/pom.xml clean install -DskipTests
 
@@ -41,6 +44,8 @@ steps:
   - name: Build service-registry
     run: mvn -f service-registry/pom.xml clean install -DskipTests
 
+  # -------- DOCKER --------
+
   - name: Build Docker images
     run: |
       docker build -t task-manager-auth ./auth-service
@@ -50,6 +55,8 @@ steps:
 
   - name: Start services
     run: docker compose up -d
+
+  # -------- WAIT FOR EUREKA --------
 
   - name: Wait for Eureka + services
     run: |
@@ -72,6 +79,8 @@ steps:
         sleep 5
       done
 
+  # -------- WAIT FOR GATEWAY --------
+
   - name: Wait for Gateway
     run: |
       for i in {1..30}; do
@@ -92,6 +101,8 @@ steps:
       docker compose logs
       exit 1
 
+  # -------- TEST --------
+
   - name: Setup Node
     uses: actions/setup-node@v4
     with:
@@ -106,8 +117,12 @@ steps:
       -e postman_environment.json \
       --env-var "baseUrl=http://localhost:8090"
 
+  # -------- CLEANUP --------
+
   - name: Stop services
     run: docker compose down -v
+
+  # -------- PUSH (ONLY MAIN) --------
 
   - name: Login to DockerHub
     if: github.ref == 'refs/heads/main'
@@ -130,3 +145,4 @@ steps:
 
       docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
       docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+```
