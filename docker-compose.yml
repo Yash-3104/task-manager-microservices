@@ -4,6 +4,7 @@ services:
 
   service-registry:
     build: ./service-registry
+    image: yash9912/task-manager-registry
     ports:
       - "8761:8761"
     networks:
@@ -21,6 +22,7 @@ services:
 
   auth-service:
     build: ./auth-service
+    image: yash9912/task-manager-auth
     ports:
       - "8085:8081"
     depends_on:
@@ -33,6 +35,7 @@ services:
 
   task-service:
     build: ./task-service
+    image: yash9912/task-manager-task
     ports:
       - "8082:8082"
     depends_on:
@@ -45,6 +48,7 @@ services:
 
   api-gateway:
     build: ./api-gateway
+    image: yash9912/task-manager-gateway
     ports:
       - "8090:8080"
     depends_on:

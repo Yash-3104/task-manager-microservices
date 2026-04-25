@@ -138,15 +138,4 @@ jobs:
 
       - name: Push Docker images
         if: github.ref == 'refs/heads/main'
-        run: |
-          docker tag task-manager-microservices-auth-service ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
-          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
-
-          docker tag task-manager-microservices-task-service ${{ secrets.DOCKER_USERNAME }}/task-manager-task
-          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
-
-          docker tag task-manager-microservices-api-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
-          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
-
-          docker tag task-manager-microservices-service-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
-          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+        run: docker compose push
