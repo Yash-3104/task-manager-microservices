@@ -121,7 +121,7 @@ jobs:
         run: |
           newman run postman_collection.json \
             -e postman_environment.json \
-            --env-var "baseUrl=http://localhost:8090"
+            --env-var "baseUrl=http://localhost:8090" \
             --env-var "username=" \
             --env-var "password=" \
             --env-var "auth_token="
