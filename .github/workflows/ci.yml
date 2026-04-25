@@ -14,7 +14,6 @@ build:
 runs-on: ubuntu-latest
 
 steps:
-
   - name: Checkout code
     uses: actions/checkout@v4
 
@@ -54,30 +53,27 @@ steps:
 
   - name: Wait for Eureka + services
     run: |
-      echo "Waiting for services to register in Eureka..."
-
       for i in {1..50}; do
-        echo "Attempt $i..."
+        echo "Checking Eureka..."
 
         eureka=$(curl -s http://localhost:8761/eureka/apps || true)
 
-        auth=$(echo "$eureka" | grep -c "AUTH-SERVICE" || true)
-        task=$(echo "$eureka" | grep -c "TASK-SERVICE" || true)
+        echo "$eureka" | grep -q "AUTH-SERVICE"
+        auth=$?
 
-        echo "AUTH: $auth | TASK: $task"
+        echo "$eureka" | grep -q "TASK-SERVICE"
+        task=$?
 
-        if [[ "$auth" -gt 0 && "$task" -gt 0 ]]; then
-          echo "Services registered in Eureka ✅"
+        if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
+          echo "Services registered ✅"
           break
         fi
 
         sleep 5
       done
 
-  - name: Wait for Gateway readiness
+  - name: Wait for Gateway
     run: |
-      echo "Waiting for API Gateway..."
-
       for i in {1..30}; do
         status=$(curl -s -o /dev/null -w "%{http_code}" \
           http://localhost:8090/api/auth/login || echo "000")
@@ -85,7 +81,7 @@ steps:
         echo "Gateway status: $status"
 
         if [[ "$status" =~ ^(200|400|401)$ ]]; then
-          echo "Gateway is READY ✅"
+          echo "Gateway ready ✅"
           exit 0
         fi
 
