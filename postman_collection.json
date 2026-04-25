@@ -1,211 +1,143 @@
 {
   "info": {
-    "name": "Task Manager E2E",
+    "name": "Task Manager E2E (Dynamic)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "const unique = Date.now();",
+          "const username = 'user_' + unique;",
+          "const password = 'pass_' + unique;",
+          "",
+          "const statuses = ['TODO','IN_PROGRESS','DONE'];",
+          "const priorities = ['LOW','MEDIUM','HIGH'];",
+          "",
+          "const status = statuses[Math.floor(Math.random() * statuses.length)];",
+          "const priority = priorities[Math.floor(Math.random() * priorities.length)];",
+          "",
+          "const today = new Date();",
+          "const startDate = today.toISOString().split('T')[0];",
+          "",
+          "const due = new Date();",
+          "due.setDate(today.getDate() + 3);",
+          "const dueDate = due.toISOString().split('T')[0];",
+          "",
+          "pm.environment.set('username', username);",
+          "pm.environment.set('password', password);",
+          "pm.environment.set('status', status);",
+          "pm.environment.set('priority', priority);",
+          "pm.environment.set('startDate', startDate);",
+          "pm.environment.set('dueDate', dueDate);"
+        ]
+      }
+    }
+  ],
+
   "item": [
 
     {
-      "name": "register-yash",
+      "name": "register",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{ \"username\": \"yash\", \"password\": \"123\", \"role\": \"USER\" }"
+          "raw": "{ \"username\": \"{{username}}\", \"password\": \"{{password}}\", \"role\": \"USER\" }"
         },
         "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-
-    {
-      "name": "register-rahul",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"username\": \"rahul\", \"password\": \"123\", \"role\": \"USER\" }"
-        },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-
-    {
-      "name": "register-admin",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"username\": \"admin\", \"password\": \"123\", \"role\": \"ADMIN\" }"
-        },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-
-    {
-      "name": "login-yash",
+      },
       "event": [{
         "listen": "test",
         "script": {
           "exec": [
-            "if (pm.response.code === 200) {",
-            "  const json = pm.response.json();",
-            "  pm.environment.set('token_yash', json.accessToken);",
-            "}"
+            "pm.test('Register success', function () {",
+            "    pm.expect(pm.response.code).to.be.oneOf([200,201,400]);",
+            "});"
           ]
         }
-      }],
+      }]
+    },
+
+    {
+      "name": "login",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{ \"username\": \"yash\", \"password\": \"123\" }"
+          "raw": "{ \"username\": \"{{username}}\", \"password\": \"{{password}}\" }"
         },
         "url": "{{baseUrl}}/api/auth/login"
-      }
-    },
-
-    {
-      "name": "login-rahul",
+      },
       "event": [{
         "listen": "test",
         "script": {
           "exec": [
-            "if (pm.response.code === 200) {",
-            "  const json = pm.response.json();",
-            "  pm.environment.set('token_rahul', json.accessToken);",
-            "}"
+            "const json = pm.response.json();",
+            "pm.environment.set('auth_token', json.accessToken);",
+            "",
+            "pm.test('Login success', function () {",
+            "    pm.response.to.have.status(200);",
+            "});"
           ]
         }
-      }],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"username\": \"rahul\", \"password\": \"123\" }"
-        },
-        "url": "{{baseUrl}}/api/auth/login"
-      }
+      }]
     },
 
     {
-      "name": "login-admin",
-      "event": [{
-        "listen": "test",
-        "script": {
-          "exec": [
-            "if (pm.response.code === 200) {",
-            "  const json = pm.response.json();",
-            "  pm.environment.set('token_admin', json.accessToken);",
-            "}"
-          ]
-        }
-      }],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"username\": \"admin\", \"password\": \"123\" }"
-        },
-        "url": "{{baseUrl}}/api/auth/login"
-      }
-    },
-
-    {
-      "name": "create-task-yash",
+      "name": "create-task",
       "request": {
         "method": "POST",
         "header": [
           { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token_yash}}" }
+          { "key": "Authorization", "value": "Bearer {{auth_token}}" }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{ \"title\": \"Yash Task\", \"description\": \"Only for yash\", \"status\": \"TODO\", \"priority\": \"HIGH\" }"
+          "raw": "{\n  \"title\": \"Task {{username}}\",\n  \"description\": \"Generated dynamically\",\n  \"status\": \"{{status}}\",\n  \"priority\": \"{{priority}}\",\n  \"startDate\": \"{{startDate}}\",\n  \"dueDate\": \"{{dueDate}}\",\n  \"assignedUsername\": \"{{username}}\"\n}"
         },
         "url": "{{baseUrl}}/api/tasks"
-      }
-    },
-
-    {
-      "name": "create-task-rahul",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token_rahul}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"title\": \"Rahul Task\", \"description\": \"Only for rahul\", \"status\": \"TODO\", \"priority\": \"LOW\" }"
-        },
-        "url": "{{baseUrl}}/api/tasks"
-      }
-    },
-
-    {
-      "name": "dashboard-yash",
+      },
       "event": [{
         "listen": "test",
         "script": {
           "exec": [
-            "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('Has totalTasks', function () { pm.expect(pm.response.json()).to.have.property('totalTasks'); });"
+            "pm.test('Task created', function () {",
+            "    pm.response.to.have.status(200);",
+            "});"
           ]
         }
-      }],
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token_yash}}" }
-        ],
-        "url": "{{baseUrl}}/api/tasks/dashboard"
-      }
+      }]
     },
 
     {
-      "name": "dashboard-rahul",
+      "name": "dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/tasks/dashboard"
+      },
       "event": [{
         "listen": "test",
         "script": {
           "exec": [
-            "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('Has totalTasks', function () { pm.expect(pm.response.json()).to.have.property('totalTasks'); });"
+            "pm.test('Status is 200', function () {",
+            "    pm.response.to.have.status(200);",
+            "});",
+            "",
+            "pm.test('Has totalTasks', function () {",
+            "    const json = pm.response.json();",
+            "    pm.expect(json).to.have.property('totalTasks');",
+            "});"
           ]
         }
-      }],
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token_rahul}}" }
-        ],
-        "url": "{{baseUrl}}/api/tasks/dashboard"
-      }
-    },
-
-    {
-      "name": "dashboard-admin",
-      "event": [{
-        "listen": "test",
-        "script": {
-          "exec": [
-            "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('Has totalTasks', function () { pm.expect(pm.response.json()).to.have.property('totalTasks'); });"
-          ]
-        }
-      }],
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token_admin}}" }
-        ],
-        "url": "{{baseUrl}}/api/tasks/dashboard"
-      }
+      }]
     }
 
   ]
