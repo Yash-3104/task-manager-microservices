@@ -48,9 +48,12 @@ services:
     ports:
       - "8090:8080"
     depends_on:
-      - service-registry
-      - auth-service
-      - task-service
+       service-registry :
+          condition: service_started
+       auth-service :
+          condition: service_started
+       task-service :
+          condition: service_started
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     networks:

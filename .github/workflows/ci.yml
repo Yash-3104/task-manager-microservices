@@ -51,12 +51,11 @@ jobs:
         run: sleep 40
 
       - name: Debug containers
-        run: |
-          docker compose ps
+        run: docker compose ps
 
       - name: Wait for Eureka
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 80); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761/eureka/apps || echo "000")
             echo "Eureka status: $code"
             if [ "$code" = "200" ]; then
@@ -84,6 +83,24 @@ jobs:
 
             sleep 5
           done
+          docker compose logs --no-color
+          exit 1
+
+      - name: Wait for Gateway route resolution
+        run: |
+          for i in $(seq 1 40); do
+            resp=$(curl -s http://localhost:8090/actuator/gateway/routes || true)
+
+            echo "$resp" | grep -q "AUTH-SERVICE"
+            if [ $? -eq 0 ]; then
+              echo "Gateway routing ready"
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Gateway routing NOT ready"
           docker compose logs --no-color
           exit 1
 
