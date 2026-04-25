@@ -123,7 +123,8 @@ jobs:
             -e postman_environment.json \
             --env-var "baseUrl=http://localhost:8090"
             --env-var "username=" \
-            --env-var "password="
+            --env-var "password=" \
+            --env-var "auth_token="
 
       - name: Stop services
         run: docker compose down -v
