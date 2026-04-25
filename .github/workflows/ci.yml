@@ -48,7 +48,7 @@ jobs:
         run: docker compose up -d
 
       - name: Wait before readiness checks
-        run: sleep 40
+        run: sleep 60
 
       - name: Debug containers
         run: docker compose ps
@@ -86,36 +86,26 @@ jobs:
           docker compose logs --no-color
           exit 1
 
-      - name: Wait for Gateway route resolution
+      - name: Wait for Gateway (real routing check)
         run: |
-          for i in $(seq 1 40); do
-            resp=$(curl -s http://localhost:8090/actuator/gateway/routes || true)
+          for i in $(seq 1 50); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST http://localhost:8090/api/auth/login \
+              -H "Content-Type: application/json" \
+              -d '{"username":"test","password":"test"}' \
+              || echo "000")
 
-            echo "$resp" | grep -q "AUTH-SERVICE"
-            if [ $? -eq 0 ]; then
-              echo "Gateway routing ready"
-              exit 0
-            fi
-
-            sleep 5
-          done
-
-          echo "Gateway routing NOT ready"
-          docker compose logs --no-color
-          exit 1
-
-      - name: Wait for Gateway
-        run: |
-          for i in $(seq 1 40); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/login || echo "000")
             echo "Gateway status: $status"
 
             if [ "$status" = "200" ] || [ "$status" = "400" ] || [ "$status" = "401" ]; then
+              echo "Gateway ready"
               exit 0
             fi
 
             sleep 5
           done
+
+          echo "Gateway NOT ready"
           docker compose logs --no-color
           exit 1
 
