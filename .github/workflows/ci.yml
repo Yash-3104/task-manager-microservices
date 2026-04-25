@@ -53,7 +53,7 @@ jobs:
 
       - name: Wait for Eureka + services
         run: |
-          for i in {1..50}; do
+          for i in $(seq 1 50); do
             eureka=$(curl -s http://localhost:8761/eureka/apps || true)
 
             echo "$eureka" | grep -q "AUTH-SERVICE"
@@ -63,27 +63,33 @@ jobs:
             task=$?
 
             if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
+             echo "Services registered"
               exit 0
             fi
 
             sleep 5
           done
 
+          echo "Eureka NOT ready"
           docker compose logs
           exit 1
 
       - name: Wait for Gateway
         run: |
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/api/auth/login || echo "000")
 
-            if [[ "$status" =~ ^(200|400|401)$ ]]; then
+            echo "Status: $status"
+
+            if [ "$status" = "200" ] || [ "$status" = "400" ] || [ "$status" = "401" ]; then
+            echo "Gateway ready"
               exit 0
             fi
 
             sleep 5
           done
 
+          echo "Gateway NOT ready"
           docker compose logs
           exit 1
 
