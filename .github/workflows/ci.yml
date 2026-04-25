@@ -15,100 +15,100 @@ jobs:
 
     steps:
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
-    - name: Build auth-service
-     run: mvn -f auth-service/pom.xml clean install -DskipTests
+      - name: Build auth-service
+        run: mvn -f auth-service/pom.xml clean install -DskipTests
 
-    - name: Build task-service
-     run: mvn -f task-service/pom.xml clean install -DskipTests
+      - name: Build task-service
+        run: mvn -f task-service/pom.xml clean install -DskipTests
 
-    - name: Build api-gateway
-     run: mvn -f api-gateway/pom.xml clean install -DskipTests
+      - name: Build api-gateway
+        run: mvn -f api-gateway/pom.xml clean install -DskipTests
 
-    - name: Build service-registry
-     run: mvn -f service-registry/pom.xml clean install -DskipTests
+      - name: Build service-registry
+        run: mvn -f service-registry/pom.xml clean install -DskipTests
 
-    - name: Build Docker images
-      run: |
-        docker build -t task-manager-auth ./auth-service
-        docker build -t task-manager-task ./task-service
-        docker build -t task-manager-gateway ./api-gateway
-        docker build -t task-manager-registry ./service-registry
+      - name: Build Docker images
+        run: |
+          docker build -t task-manager-auth ./auth-service
+          docker build -t task-manager-task ./task-service
+          docker build -t task-manager-gateway ./api-gateway
+          docker build -t task-manager-registry ./service-registry
 
-    - name: Start services
-      run: docker compose up -d
+      - name: Start services
+        run: docker compose up -d
 
-    - name: Wait for system readiness
-      run: |
-        for i in {1..40}; do
-          echo "Checking gateway..."
+      - name: Wait for system readiness
+        run: |
+          for i in {1..40}; do
+            echo "Checking gateway..."
 
-          status=$(curl -s -o /dev/null -w "%{http_code}" \
-            http://localhost:8090/api/auth/login || echo "000")
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://localhost:8090/api/auth/login || echo "000")
 
-          echo "Status: $status"
+            echo "Status: $status"
 
-          if [[ "$status" =~ ^(200|400|401)$ ]]; then
-            echo "System is READY ✅"
-            exit 0
-          fi
+            if [[ "$status" =~ ^(200|400|401)$ ]]; then
+              echo "System is READY ✅"
+              exit 0
+            fi
 
-          sleep 5
-        done
+            sleep 5
+          done
 
-        echo "System NOT ready ❌"
-        docker compose logs
-        exit 1
+          echo "System NOT ready ❌"
+          docker compose logs
+          exit 1
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    - name: Install Newman
-      run: npm install -g newman
+      - name: Install Newman
+        run: npm install -g newman
 
-    - name: Run Postman tests
-      run: |
-        newman run postman_collection.json \
-        -e postman_environment.json \
-        --env-var "baseUrl=http://localhost:8090"
+      - name: Run Postman tests
+        run: |
+          newman run postman_collection.json \
+          -e postman_environment.json \
+          --env-var "baseUrl=http://localhost:8090"
 
-    - name: Stop services
-      run: docker compose down -v
+      - name: Stop services
+        run: docker compose down -v
 
-    - name: Login to DockerHub
-      if: github.ref == 'refs/heads/main'
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Push Docker images
-      if: github.ref == 'refs/heads/main'
-      run: |
-        docker tag task-manager-auth ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
+      - name: Push Docker images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag task-manager-auth ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
 
-        docker tag task-manager-task ${{ secrets.DOCKER_USERNAME }}/task-manager-task
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
+          docker tag task-manager-task ${{ secrets.DOCKER_USERNAME }}/task-manager-task
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
 
-        docker tag task-manager-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+          docker tag task-manager-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
 
-        docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+          docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
