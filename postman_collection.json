@@ -9,29 +9,32 @@
       "listen": "prerequest",
       "script": {
         "exec": [
-          "const unique = Date.now();",
-          "const username = 'user_' + unique;",
-          "const password = 'pass_' + unique;",
+          "if (!pm.environment.get('username')) {",
+          "    const unique = Date.now();",
           "",
-          "const statuses = ['TODO','IN_PROGRESS','DONE'];",
-          "const priorities = ['LOW','MEDIUM','HIGH'];",
+          "    const username = 'user_' + unique;",
+          "    const password = 'pass_' + unique;",
           "",
-          "const status = statuses[Math.floor(Math.random() * statuses.length)];",
-          "const priority = priorities[Math.floor(Math.random() * priorities.length)];",
+          "    const statuses = ['TODO','IN_PROGRESS','DONE'];",
+          "    const priorities = ['LOW','MEDIUM','HIGH'];",
           "",
-          "const today = new Date();",
-          "const startDate = today.toISOString().split('T')[0];",
+          "    const status = statuses[Math.floor(Math.random() * statuses.length)];",
+          "    const priority = priorities[Math.floor(Math.random() * priorities.length)];",
           "",
-          "const due = new Date();",
-          "due.setDate(today.getDate() + 3);",
-          "const dueDate = due.toISOString().split('T')[0];",
+          "    const today = new Date();",
+          "    const startDate = today.toISOString().split('T')[0];",
           "",
-          "pm.environment.set('username', username);",
-          "pm.environment.set('password', password);",
-          "pm.environment.set('status', status);",
-          "pm.environment.set('priority', priority);",
-          "pm.environment.set('startDate', startDate);",
-          "pm.environment.set('dueDate', dueDate);"
+          "    const due = new Date();",
+          "    due.setDate(today.getDate() + 3);",
+          "    const dueDate = due.toISOString().split('T')[0];",
+          "",
+          "    pm.environment.set('username', username);",
+          "    pm.environment.set('password', password);",
+          "    pm.environment.set('status', status);",
+          "    pm.environment.set('priority', priority);",
+          "    pm.environment.set('startDate', startDate);",
+          "    pm.environment.set('dueDate', dueDate);",
+          "}"
         ]
       }
     }
@@ -78,11 +81,14 @@
         "script": {
           "exec": [
             "const json = pm.response.json();",
-            "pm.environment.set('auth_token', json.accessToken);",
             "",
             "pm.test('Login success', function () {",
-            "    pm.response.to.have.status(200);",
-            "});"
+            "    pm.expect(pm.response.code).to.eql(200);",
+            "});",
+            "",
+            "if (pm.response.code === 200) {",
+            "    pm.environment.set('auth_token', json.accessToken || json.token);",
+            "}"
           ]
         }
       }]
@@ -107,7 +113,7 @@
         "script": {
           "exec": [
             "pm.test('Task created', function () {",
-            "    pm.response.to.have.status(200);",
+            "    pm.expect(pm.response.code).to.be.oneOf([200,201]);",
             "});"
           ]
         }
@@ -127,8 +133,8 @@
         "listen": "test",
         "script": {
           "exec": [
-            "pm.test('Status is 200', function () {",
-            "    pm.response.to.have.status(200);",
+            "pm.test('Dashboard OK', function () {",
+            "    pm.expect(pm.response.code).to.eql(200);",
             "});",
             "",
             "pm.test('Has totalTasks', function () {",

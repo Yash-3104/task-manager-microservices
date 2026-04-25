@@ -122,6 +122,8 @@ jobs:
           newman run postman_collection.json \
             -e postman_environment.json \
             --env-var "baseUrl=http://localhost:8090"
+            --env-var "username=" \
+            --env-var "password="
 
       - name: Stop services
         run: docker compose down -v
