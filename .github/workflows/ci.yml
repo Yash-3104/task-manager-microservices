@@ -42,7 +42,7 @@ jobs:
         run: mvn -f service-registry/pom.xml clean install -DskipTests
 
       - name: Build Docker images
-        run: docker compose build
+        run: docker compose build --no-cache
 
       - name: Start services
         run: docker compose up -d
@@ -86,7 +86,7 @@ jobs:
           docker compose logs --no-color
           exit 1
 
-      - name: Wait for Gateway (real routing check)
+      - name: Wait for Gateway
         run: |
           for i in $(seq 1 50); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -121,13 +121,13 @@ jobs:
         run: |
           newman run postman_collection.json \
             -e postman_environment.json \
-            --env-var "baseUrl=http://localhost:8090" \
-            --env-var "username=" \
-            --env-var "password=" \
-            --env-var "auth_token="
+            --env-var "baseUrl=http://localhost:8090"
 
       - name: Stop services
         run: docker compose down -v
+
+      - name: Debug Docker images
+        run: docker images
 
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
