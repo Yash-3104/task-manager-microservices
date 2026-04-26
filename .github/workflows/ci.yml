@@ -103,9 +103,6 @@ jobs:
             -e postman_environment.json \
             --env-var "baseUrl=http://localhost:8090"
 
-      - name: Stop services
-        run: docker compose down -v
-
       - name: Debug Docker images
         run: docker images
 
@@ -120,18 +117,13 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: docker info | grep Username || true
 
-      - name: Push auth image
+      - name: Push images
         if: github.ref == 'refs/heads/main'
-        run: docker push yash9912/task-manager-auth:latest 2>&1 | tee /tmp/push-auth.log
+        run: |
+          docker push yash9912/task-manager-auth:latest
+          docker push yash9912/task-manager-task:latest
+          docker push yash9912/task-manager-gateway:latest
+          docker push yash9912/task-manager-registry:latest
 
-      - name: Push task image
-        if: github.ref == 'refs/heads/main'
-        run: docker push yash9912/task-manager-task:latest 2>&1 | tee /tmp/push-task.log
-
-      - name: Push gateway image
-        if: github.ref == 'refs/heads/main'
-        run: docker push yash9912/task-manager-gateway:latest 2>&1 | tee /tmp/push-gateway.log
-
-      - name: Push registry image
-        if: github.ref == 'refs/heads/main'
-        run: docker push yash9912/task-manager-registry:latest 2>&1 | tee /tmp/push-registry.log
+      - name: Stop services
+        run: docker compose down -v
