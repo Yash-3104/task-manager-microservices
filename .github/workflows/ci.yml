@@ -117,6 +117,9 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: docker info | grep Username || true
 
+      - name: Debug Docker login
+        run: docker info  
+
       - name: Push images
         if: github.ref == 'refs/heads/main'
         run: |
@@ -127,3 +130,4 @@ jobs:
 
       - name: Stop services
         run: docker compose down -v
+
