@@ -106,7 +106,7 @@ jobs:
       - name: Debug Docker images
         run: docker images
 
-      - name: Login to DockerHub 
+      - name: Login to DockerHub  
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -118,6 +118,16 @@ jobs:
 
       - name: Debug Docker login
         run: docker info  
+      
+      - name: Tag images
+        run: |
+          docker tag task-manager-microservices-auth-service yash9912/task-manager-auth:latest
+          docker tag task-manager-microservices-task-service yash9912/task-manager-task:latest
+          docker tag task-manager-microservices-api-gateway yash9912/task-manager-gateway:latest
+          docker tag task-manager-microservices-service-registry yash9912/task-manager-registry:latest
+
+      - name: Debug images
+        run: docker images  
 
       - name: Push images
         if: github.ref == 'refs/heads/main'
