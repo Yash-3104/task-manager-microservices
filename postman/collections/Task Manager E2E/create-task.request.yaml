@@ -1,0 +1,18 @@
+$kind: http-request
+name: create-task
+url: "{{baseUrl}}/api/tasks"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Task {{username}}\",\r
+
+    \  \"description\": \"Generated dynamically\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: auth_token
+order: 4503596869659604

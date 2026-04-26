@@ -1,32 +1,26 @@
-version: "3.9"
-
 services:
 
   service-registry:
     build: ./service-registry
-    container_name: service-registry
+    image: yash9912/task-manager-registry
     ports:
       - "8761:8761"
     networks:
       - microservices-net
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+
   redis:
     image: redis:7
-    container_name: redis
     ports:
       - "6379:6379"
     command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no"]
     networks:
       - microservices-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+
   auth-service:
     build: ./auth-service
-    container_name: auth-service
+    image: yash9912/task-manager-auth
     ports:
       - "8085:8081"
     depends_on:
@@ -39,15 +33,12 @@ services:
 
   task-service:
     build: ./task-service
-    container_name: task-service
+    image: yash9912/task-manager-task
     ports:
       - "8082:8082"
     depends_on:
-       service-registry :
-         condition: service_started
-       redis :
-         condition: service_healthy
-    restart: always
+      - service-registry
+      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     networks:
@@ -55,13 +46,16 @@ services:
 
   api-gateway:
     build: ./api-gateway
-    container_name: api-gateway
+    image: yash9912/task-manager-gateway
     ports:
       - "8090:8080"
     depends_on:
-      - service-registry
-      - auth-service
-      - task-service
+       service-registry :
+          condition: service_started
+       auth-service :
+          condition: service_started
+       task-service :
+          condition: service_started
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     networks:
@@ -70,4 +64,3 @@ services:
 networks:
   microservices-net:
     driver: bridge
-

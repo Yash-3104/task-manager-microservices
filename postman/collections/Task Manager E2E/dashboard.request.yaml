@@ -1,0 +1,5 @@
+$kind: http-request
+name: dashboard
+url: ""
+method: GET
+order: 4503596896278070

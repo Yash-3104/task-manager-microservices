@@ -10,109 +10,146 @@ on:
       - main
 
 jobs:
-  build:
+  build-jars:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - task-service
+          - api-gateway
+          - service-registry
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Build ${{ matrix.service }}
+        run: mvn -f ${{ matrix.service }}/pom.xml clean package -DskipTests
 
-    - name: Build auth-service
-      run: cd auth-service && mvn clean install
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-jar
+          path: ${{ matrix.service }}/target/*.jar
+          if-no-files-found: error
 
-    - name: Build task-service
-      run: cd task-service && mvn clean install
+  integration:
+    runs-on: ubuntu-latest
+    needs: build-jars
 
-    - name: Build api-gateway
-      run: cd api-gateway && mvn clean install
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Build service-registry
-      run: cd service-registry && mvn clean install
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    - name: Build Docker images
-      run: |
-        docker build -t task-manager-auth ./auth-service
-        docker build -t task-manager-task ./task-service
-        docker build -t task-manager-gateway ./api-gateway
-        docker build -t task-manager-registry ./service-registry
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
-    - name: Build services (compose)
-      run: docker compose build
+      - name: Download auth-service jar
+        uses: actions/download-artifact@v4
+        with:
+          name: auth-service-jar
+          path: auth-service/target
 
-    - name: Start services
-      run: docker compose up -d
+      - name: Download task-service jar
+        uses: actions/download-artifact@v4
+        with:
+          name: task-service-jar
+          path: task-service/target
 
-    - name: Wait for system readiness
-      run: |
-        for i in {1..40}; do
-          echo "Checking system readiness..."
+      - name: Download api-gateway jar
+        uses: actions/download-artifact@v4
+        with:
+          name: api-gateway-jar
+          path: api-gateway/target
 
-          auth_status=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST http://localhost:8090/api/auth/login \
-            -H "Content-Type: application/json" \
-            -d '{"username":"test","password":"test"}' \
-            || echo "000")
+      - name: Download service-registry jar
+        uses: actions/download-artifact@v4
+        with:
+          name: service-registry-jar
+          path: service-registry/target
 
-          task_status=$(curl -s -o /dev/null -w "%{http_code}" \
-            http://localhost:8090/api/tasks/dashboard || echo "000")
+      - name: Build Docker images
+        run: docker compose build
 
-          echo "Auth: $auth_status | Task: $task_status"
+      - name: Start services
+        run: docker compose up -d
 
-          if [[ "$auth_status" =~ ^(200|400|401)$ ]] && [[ "$task_status" =~ ^(200|403)$ ]]; then
-            echo "System is READY ✅"
-            exit 0
-          fi
+      - name: Wait before readiness checks
+        run: sleep 40
 
-          sleep 5
-        done
+      - name: Wait for Gateway
+        run: |
+          for i in $(seq 1 50); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST http://localhost:8090/api/auth/login \
+              -H "Content-Type: application/json" \
+              -d '{"username":"test","password":"test"}' \
+              || echo "000")
 
-        echo "System NOT ready ❌"
-        docker compose logs
-        exit 1
+            echo "Gateway status: $status"
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
+            if [ "$status" = "200" ] || [ "$status" = "400" ] || [ "$status" = "401" ]; then
+              echo "Gateway ready"
+              exit 0
+            fi
 
-    - name: Install Newman
-      run: npm install -g newman
+            sleep 5
+          done
 
-    - name: Run Postman tests
-      run: newman run postman_collection.json -e postman_environment.json
+          echo "Gateway NOT ready"
+          docker compose logs --no-color
+          exit 1
 
-    - name: Stop services
-      run: docker compose down -v
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Install Newman
+        run: npm install -g newman
 
-    - name: Push Docker images
-      run: |
-        docker tag task-manager-auth ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-auth
+      - name: Run Postman tests
+        run: |
+          newman run postman_collection.json \
+            -e postman_environment.json \
+            --env-var "baseUrl=http://localhost:8090"
 
-        docker tag task-manager-task ${{ secrets.DOCKER_USERNAME }}/task-manager-task
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-task
+      - name: Stop services
+        run: docker compose down -v
 
-        docker tag task-manager-gateway ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-gateway
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-        docker tag task-manager-registry ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
-        docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-registry
+      - name: Push images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push yash9912/task-manager-auth:latest
+          docker push yash9912/task-manager-task:latest
+          docker push yash9912/task-manager-gateway:latest
+          docker push yash9912/task-manager-registry:latest 
