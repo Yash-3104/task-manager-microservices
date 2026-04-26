@@ -147,7 +147,6 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push images
-        if: github.ref == 'refs/heads/main'
         run: |
           docker push yash9912/task-manager-auth:latest
           docker push yash9912/task-manager-task:latest
