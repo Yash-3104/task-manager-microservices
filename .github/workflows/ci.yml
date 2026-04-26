@@ -121,7 +121,7 @@ jobs:
         run: docker compose down -v
 
   # -------------------------
-  # PUSH IMAGES
+  # PUSH DOCKER IMAGES
   # -------------------------
   push-images:
     runs-on: ubuntu-latest
