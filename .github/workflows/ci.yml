@@ -102,11 +102,17 @@ jobs:
             eureka=$(curl -s http://localhost:8761/eureka/apps || true)
             echo "$eureka"
 
-            echo "$eureka" | grep -qi "AUTH-SERVICE"
-            auth=$?
+            if echo "$eureka" | grep -qi "AUTH-SERVICE"; then
+             auth=0
+            else
+             auth=1
+            fi
 
-            echo "$eureka" | grep -qi "TASK-SERVICE"
-            task=$?
+            if echo "$eureka" | grep -qi "TASK-SERVICE"; then
+             task=0
+            else
+             task=1
+            fi
 
             if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
               echo "Services registered"
