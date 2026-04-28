@@ -185,6 +185,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: auth-service-jar
+          path: auth-service/target
+
+      - uses: actions/download-artifact@v4
+        with:
+         name: task-service-jar
+         path: task-service/target
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-gateway-jar
+          path: api-gateway/target
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: service-registry-jar
+          path: service-registry/target
+
       - name: Login DockerHub
         uses: docker/login-action@v3
         with:
