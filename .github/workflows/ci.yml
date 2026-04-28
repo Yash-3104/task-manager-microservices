@@ -48,6 +48,7 @@ jobs:
           path: ${{ matrix.service }}/target/*.jar
           if-no-files-found: error
 
+
   # -------------------------
   # INTEGRATION TESTS
   # -------------------------
@@ -58,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download all JARs
+      # Download JARs
       - uses: actions/download-artifact@v4
         with:
           name: auth-service-jar
@@ -79,11 +80,47 @@ jobs:
           name: service-registry-jar
           path: service-registry/target
 
+      # Build & run
       - name: Build Docker images
         run: docker compose build
 
       - name: Start services
         run: docker compose up -d
+
+      #  FIX: wait properly
+      - name: Wait for Eureka
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761/eureka/apps || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "Eureka ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs --no-color
+          exit 1
+
+      - name: Wait for services registration
+        run: |
+          for i in $(seq 1 60); do
+            eureka=$(curl -s http://localhost:8761/eureka/apps || true)
+
+            echo "$eureka" | grep -q "AUTH-SERVICE"
+            auth=$?
+
+            echo "$eureka" | grep -q "TASK-SERVICE"
+            task=$?
+
+            if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
+              echo "Services registered"
+              exit 0
+            fi
+
+            sleep 5
+          done
+          docker compose logs --no-color
+          exit 1
 
       - name: Wait for Gateway
         run: |
@@ -105,6 +142,7 @@ jobs:
           docker compose logs --no-color
           exit 1
 
+      # Tests
       - uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -119,6 +157,7 @@ jobs:
 
       - name: Stop services
         run: docker compose down -v
+
 
   # -------------------------
   # PUSH DOCKER IMAGES
@@ -159,17 +198,18 @@ jobs:
 
       - name: Build & Push images
         run: |
-          docker build -t yash9912/task-manager-auth ./auth-service
-          docker push yash9912/task-manager-auth
+          docker build -t yash9912/task-manager-auth:latest ./auth-service
+          docker push yash9912/task-manager-auth:latest
 
-          docker build -t yash9912/task-manager-task ./task-service
-          docker push yash9912/task-manager-task
+          docker build -t yash9912/task-manager-task:latest ./task-service
+          docker push yash9912/task-manager-task:latest
 
-          docker build -t yash9912/task-manager-gateway ./api-gateway
-          docker push yash9912/task-manager-gateway
+          docker build -t yash9912/task-manager-gateway:latest ./api-gateway
+          docker push yash9912/task-manager-gateway:latest
 
-          docker build -t yash9912/task-manager-registry ./service-registry
-          docker push yash9912/task-manager-registry
+          docker build -t yash9912/task-manager-registry:latest ./service-registry
+          docker push yash9912/task-manager-registry:latest
+
 
   # -------------------------
   # DEPLOY TO EC2
