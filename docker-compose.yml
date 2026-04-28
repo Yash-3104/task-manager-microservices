@@ -1,19 +1,20 @@
 services:
 
   service-registry:
-  build: ./service-registry
-  image: yash9912/task-manager-registry
-  ports:
-    - "8761:8761"
-  networks:
-    - microservices-net
-  environment:
-    - SPRING_PROFILES_ACTIVE=docker
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8761/eureka/apps"]
-    interval: 10s
-    timeout: 5s
-    retries: 10
+    build: ./service-registry
+    image: yash9912/task-manager-registry
+    ports:
+      - "8761:8761"
+    networks:
+      - microservices-net
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/eureka/apps"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: always
 
   redis:
     image: redis:7
@@ -22,6 +23,7 @@ services:
     command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no"]
     networks:
       - microservices-net
+    restart: always
 
   auth-service:
     build: ./auth-service
@@ -29,14 +31,13 @@ services:
     ports:
       - "8085:8081"
     depends_on:
-       service-registry:
-         condition: service_healthy
-       redis:
-         condition: service_started
+      - service-registry
+      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     networks:
       - microservices-net
+    restart: always
 
   task-service:
     build: ./task-service
@@ -50,6 +51,7 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
     networks:
       - microservices-net
+    restart: always
 
   api-gateway:
     build: ./api-gateway
@@ -57,16 +59,14 @@ services:
     ports:
       - "8090:8080"
     depends_on:
-       service-registry :
-          condition: service_started
-       auth-service :
-          condition: service_started
-       task-service :
-          condition: service_started
+      - service-registry
+      - auth-service
+      - task-service
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     networks:
       - microservices-net
+    restart: always
 
 networks:
   microservices-net:
