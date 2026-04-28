@@ -79,7 +79,7 @@ jobs:
           name: service-registry-jar
           path: service-registry/target
 
-      # Build & Start
+      # Build + Start
       - name: Build Docker images
         run: docker compose build
 
@@ -89,21 +89,23 @@ jobs:
       # WAIT FOR EUREKA
       - name: Wait for Eureka
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 80); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761/eureka/apps || echo "000")
-            echo "Eureka: $code"
+            echo "Eureka status: $code"
             if [ "$code" = "200" ]; then
+              echo "Eureka ready"
               exit 0
             fi
             sleep 5
           done
+          echo "Eureka FAILED"
           docker compose logs
           exit 1
 
       # WAIT FOR SERVICE REGISTRATION
       - name: Wait for services registration
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 80); do
             eureka=$(curl -s http://localhost:8761/eureka/apps || true)
 
             echo "$eureka" | grep -q "AUTH-SERVICE"
@@ -117,6 +119,7 @@ jobs:
               exit 0
             fi
 
+            echo "Waiting for services..."
             sleep 5
           done
 
@@ -124,10 +127,10 @@ jobs:
           docker compose logs
           exit 1
 
-      # WAIT FOR GATEWAY
+      #  WAIT FOR GATEWAY
       - name: Wait for Gateway
         run: |
-          for i in $(seq 1 50); do
+          for i in $(seq 1 60); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
               -X POST http://localhost:8090/api/auth/login \
               -H "Content-Type: application/json" \
@@ -144,10 +147,11 @@ jobs:
             sleep 5
           done
 
+          echo "Gateway FAILED"
           docker compose logs
           exit 1
 
-      # Newman
+      # Node + Newman
       - uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -155,15 +159,19 @@ jobs:
       - run: npm install -g newman
 
       # TESTS
-      - name: Run Postman tests (with retry)
+      - name: Run Postman tests (retry)
         run: |
           for i in {1..3}; do
             newman run postman_collection.json \
               -e postman_environment.json \
               --env-var "baseUrl=http://localhost:8090" && exit 0
+
             echo "Retrying tests..."
             sleep 10
           done
+
+          echo "Tests FAILED"
+          docker compose logs
           exit 1
 
       - name: Stop services
