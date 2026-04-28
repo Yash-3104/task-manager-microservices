@@ -10,10 +10,6 @@ on:
       - main
 
 jobs:
-
-  # -------------------------
-  # BUILD JARS (PARALLEL)
-  # -------------------------
   build-jars:
     runs-on: ubuntu-latest
     strategy:
@@ -48,9 +44,6 @@ jobs:
           path: ${{ matrix.service }}/target/*.jar
           if-no-files-found: error
 
-  # -------------------------
-  # INTEGRATION TESTS
-  # -------------------------
   integration:
     runs-on: ubuntu-latest
     needs: build-jars
@@ -58,7 +51,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download JARs
       - uses: actions/download-artifact@v4
         with:
           name: auth-service-jar
@@ -79,14 +71,12 @@ jobs:
           name: service-registry-jar
           path: service-registry/target
 
-      # Build + Start
       - name: Build Docker images
         run: docker compose build
 
       - name: Start services
         run: docker compose up -d
 
-      # WAIT FOR EUREKA
       - name: Wait for Eureka
         run: |
           for i in $(seq 1 80); do
@@ -98,73 +88,67 @@ jobs:
             fi
             sleep 5
           done
+
           echo "Eureka FAILED"
-          docker compose logs
+          docker compose ps
+          docker compose logs --no-color service-registry auth-service task-service api-gateway
           exit 1
 
       - name: Wait for services registration
         run: |
-         for i in $(seq 1 80); do
-          echo "Checking Eureka..."
+          for i in $(seq 1 80); do
+            eureka=$(curl -s http://localhost:8761/eureka/apps || true)
 
-          eureka=$(curl -s http://localhost:8761/eureka/apps || true)
+            echo "$eureka" | grep -qi "AUTH-SERVICE"
+            auth=$?
 
-          echo "$eureka"
+            echo "$eureka" | grep -qi "TASK-SERVICE"
+            task=$?
 
-          echo "$eureka" | grep -q "AUTH-SERVICE"
-          auth=$?
+            if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
+              echo "Services registered"
+              exit 0
+            fi
 
-          echo "$eureka" | grep -q "TASK-SERVICE"
-          task=$?
-
-          if [ $auth -eq 0 ] && [ $task -eq 0 ]; then
-          echo "Services registered"
-          exit 0
-          fi
-
-          sleep 5
+            echo "Waiting for services..."
+            sleep 5
           done
 
-          echo "❌ Services NOT registered"
-          echo "================ LOGS ================"
-          docker compose logs --no-color
-          echo "======================================"
+          echo "Services NOT registered"
+          docker compose ps
+          docker compose logs --no-color service-registry auth-service task-service api-gateway
           exit 1
-      #  WAIT FOR GATEWAY
-      - name: Wait for Gateway
+
+      - name: Wait for Task API
         run: |
           for i in $(seq 1 60); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X POST http://localhost:8090/api/auth/login \
-              -H "Content-Type: application/json" \
-              -d '{"username":"test","password":"test"}' \
-              || echo "000")
+              http://localhost:8090/api/tasks/dashboard || echo "000")
 
-            echo "Gateway status: $status"
+            echo "Task API status: $status"
 
-            if [[ "$status" =~ ^(200|400|401)$ ]]; then
-              echo "Gateway ready"
+            if [ "$status" = "200" ] || [ "$status" = "401" ] || [ "$status" = "403" ]; then
+              echo "Task API ready"
               exit 0
             fi
 
             sleep 5
           done
 
-          echo "Gateway FAILED"
-          docker compose logs
+          echo "Task API FAILED"
+          docker compose ps
+          docker compose logs --no-color service-registry auth-service task-service api-gateway
           exit 1
 
-      # Node + Newman
       - uses: actions/setup-node@v4
         with:
           node-version: 18
 
       - run: npm install -g newman
 
-      # TESTS
       - name: Run Postman tests (retry)
         run: |
-          for i in {1..3}; do
+          for i in 1 2 3; do
             newman run postman_collection.json \
               -e postman_environment.json \
               --env-var "baseUrl=http://localhost:8090" && exit 0
@@ -174,15 +158,13 @@ jobs:
           done
 
           echo "Tests FAILED"
-          docker compose logs
+          docker compose ps
+          docker compose logs --no-color service-registry auth-service task-service api-gateway
           exit 1
 
       - name: Stop services
         run: docker compose down -v
 
-  # -------------------------
-  # PUSH IMAGES
-  # -------------------------
   push-images:
     runs-on: ubuntu-latest
     needs: integration
@@ -231,9 +213,6 @@ jobs:
           docker build -t yash9912/task-manager-registry ./service-registry
           docker push yash9912/task-manager-registry
 
-  # -------------------------
-  # DEPLOY
-  # -------------------------
   deploy:
     runs-on: ubuntu-latest
     needs: push-images
