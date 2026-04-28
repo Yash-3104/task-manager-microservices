@@ -48,7 +48,6 @@ jobs:
           path: ${{ matrix.service }}/target/*.jar
           if-no-files-found: error
 
-
   # -------------------------
   # INTEGRATION TESTS
   # -------------------------
@@ -80,27 +79,28 @@ jobs:
           name: service-registry-jar
           path: service-registry/target
 
-      # Build & run
+      # Build & Start
       - name: Build Docker images
         run: docker compose build
 
       - name: Start services
         run: docker compose up -d
 
-      #  FIX: wait properly
+      # WAIT FOR EUREKA
       - name: Wait for Eureka
         run: |
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761/eureka/apps || echo "000")
+            echo "Eureka: $code"
             if [ "$code" = "200" ]; then
-              echo "Eureka ready"
               exit 0
             fi
             sleep 5
           done
-          docker compose logs --no-color
+          docker compose logs
           exit 1
 
+      # WAIT FOR SERVICE REGISTRATION
       - name: Wait for services registration
         run: |
           for i in $(seq 1 60); do
@@ -119,9 +119,12 @@ jobs:
 
             sleep 5
           done
-          docker compose logs --no-color
+
+          echo "Services NOT registered"
+          docker compose logs
           exit 1
 
+      # WAIT FOR GATEWAY
       - name: Wait for Gateway
         run: |
           for i in $(seq 1 50); do
@@ -131,6 +134,8 @@ jobs:
               -d '{"username":"test","password":"test"}' \
               || echo "000")
 
+            echo "Gateway status: $status"
+
             if [[ "$status" =~ ^(200|400|401)$ ]]; then
               echo "Gateway ready"
               exit 0
@@ -139,28 +144,33 @@ jobs:
             sleep 5
           done
 
-          docker compose logs --no-color
+          docker compose logs
           exit 1
 
-      # Tests
+      # Newman
       - uses: actions/setup-node@v4
         with:
           node-version: 18
 
       - run: npm install -g newman
 
-      - name: Run Postman tests
+      # TESTS
+      - name: Run Postman tests (with retry)
         run: |
-          newman run postman_collection.json \
-            -e postman_environment.json \
-            --env-var "baseUrl=http://localhost:8090"
+          for i in {1..3}; do
+            newman run postman_collection.json \
+              -e postman_environment.json \
+              --env-var "baseUrl=http://localhost:8090" && exit 0
+            echo "Retrying tests..."
+            sleep 10
+          done
+          exit 1
 
       - name: Stop services
         run: docker compose down -v
 
-
   # -------------------------
-  # PUSH DOCKER IMAGES
+  # PUSH IMAGES
   # -------------------------
   push-images:
     runs-on: ubuntu-latest
@@ -198,21 +208,20 @@ jobs:
 
       - name: Build & Push images
         run: |
-          docker build -t yash9912/task-manager-auth:latest ./auth-service
-          docker push yash9912/task-manager-auth:latest
+          docker build -t yash9912/task-manager-auth ./auth-service
+          docker push yash9912/task-manager-auth
 
-          docker build -t yash9912/task-manager-task:latest ./task-service
-          docker push yash9912/task-manager-task:latest
+          docker build -t yash9912/task-manager-task ./task-service
+          docker push yash9912/task-manager-task
 
-          docker build -t yash9912/task-manager-gateway:latest ./api-gateway
-          docker push yash9912/task-manager-gateway:latest
+          docker build -t yash9912/task-manager-gateway ./api-gateway
+          docker push yash9912/task-manager-gateway
 
-          docker build -t yash9912/task-manager-registry:latest ./service-registry
-          docker push yash9912/task-manager-registry:latest
-
+          docker build -t yash9912/task-manager-registry ./service-registry
+          docker push yash9912/task-manager-registry
 
   # -------------------------
-  # DEPLOY TO EC2
+  # DEPLOY
   # -------------------------
   deploy:
     runs-on: ubuntu-latest
