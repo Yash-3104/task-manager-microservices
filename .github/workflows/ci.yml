@@ -10,6 +10,7 @@ on:
       - main
 
 jobs:
+
   build-jars:
     runs-on: ubuntu-latest
     strategy:
@@ -77,27 +78,28 @@ jobs:
       - name: Start services
         run: docker compose up -d
 
+      # 🔥 WAIT FOR EUREKA HEALTH
       - name: Wait for Eureka
         run: |
-          for i in $(seq 1 80); do
+          for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761/eureka/apps || echo "000")
-            echo "Eureka status: $code"
+            echo "Eureka: $code"
             if [ "$code" = "200" ]; then
-              echo "Eureka ready"
               exit 0
             fi
             sleep 5
           done
 
-          echo "Eureka FAILED"
-          docker compose ps
-          docker compose logs --no-color service-registry auth-service task-service api-gateway
+          docker compose logs
           exit 1
 
+      # 🔥 WAIT FOR SERVICES (FIXED CASE + DEBUG)
       - name: Wait for services registration
         run: |
           for i in $(seq 1 80); do
             eureka=$(curl -s http://localhost:8761/eureka/apps || true)
+
+            echo "$eureka"
 
             echo "$eureka" | grep -qi "AUTH-SERVICE"
             auth=$?
@@ -114,30 +116,31 @@ jobs:
             sleep 5
           done
 
-          echo "Services NOT registered"
+          echo "FAILED"
           docker compose ps
           docker compose logs --no-color service-registry auth-service task-service api-gateway
           exit 1
 
-      - name: Wait for Task API
+      # WAIT FOR GATEWAY
+      - name: Wait for Gateway
         run: |
           for i in $(seq 1 60); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
-              http://localhost:8090/api/tasks/dashboard || echo "000")
+              -X POST http://localhost:8090/api/auth/login \
+              -H "Content-Type: application/json" \
+              -d '{"username":"test","password":"test"}' \
+              || echo "000")
 
-            echo "Task API status: $status"
+            echo "Gateway: $status"
 
-            if [ "$status" = "200" ] || [ "$status" = "401" ] || [ "$status" = "403" ]; then
-              echo "Task API ready"
+            if [[ "$status" =~ ^(200|400|401)$ ]]; then
               exit 0
             fi
 
             sleep 5
           done
 
-          echo "Task API FAILED"
-          docker compose ps
-          docker compose logs --no-color service-registry auth-service task-service api-gateway
+          docker compose logs
           exit 1
 
       - uses: actions/setup-node@v4
@@ -148,18 +151,16 @@ jobs:
 
       - name: Run Postman tests (retry)
         run: |
-          for i in 1 2 3; do
+          for i in {1..3}; do
             newman run postman_collection.json \
               -e postman_environment.json \
               --env-var "baseUrl=http://localhost:8090" && exit 0
 
-            echo "Retrying tests..."
+            echo "Retry..."
             sleep 10
           done
 
-          echo "Tests FAILED"
-          docker compose ps
-          docker compose logs --no-color service-registry auth-service task-service api-gateway
+          docker compose logs
           exit 1
 
       - name: Stop services
@@ -173,33 +174,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: auth-service-jar
-          path: auth-service/target
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: task-service-jar
-          path: task-service/target
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: api-gateway-jar
-          path: api-gateway/target
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: service-registry-jar
-          path: service-registry/target
-
-      - name: Login to DockerHub
+      - name: Login DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build & Push images
+      - name: Build & Push
         run: |
           docker build -t yash9912/task-manager-auth ./auth-service
           docker push yash9912/task-manager-auth
