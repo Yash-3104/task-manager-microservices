@@ -15,7 +15,7 @@ public class DataInitializer {
     CommandLineRunner initAdmin(UserRepository repo, PasswordEncoder encoder) {
         return args -> {
 
-            if (repo.findByUsername("admin").isEmpty()) {
+            if (!repo.existsByUsername("admin")) {
 
                 User admin = new User();
                 admin.setUsername("admin");
