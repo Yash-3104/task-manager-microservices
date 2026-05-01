@@ -9,7 +9,8 @@ export function KanbanColumn({
   draggingId,
   onDropTask,
   onEditTask,
-  onDragStart
+  onDragStart,
+  pendingTaskIds
 }) {
   const label = STATUS_LABELS[status] ?? status;
   const color = STATUS_COLORS[status] ?? "slate";
@@ -23,6 +24,7 @@ export function KanbanColumn({
     const taskId = e.dataTransfer.getData("text/taskId");
     const fromStatus = e.dataTransfer.getData("text/fromStatus");
     if (!taskId) return;
+    if (pendingTaskIds?.has?.(String(taskId))) return;
     if (fromStatus === status) return;
     onDropTask?.({ taskId, toStatus: status, fromStatus });
   }
@@ -55,9 +57,12 @@ export function KanbanColumn({
             <TaskCard
               key={t.id}
               task={t}
-              draggable
+              draggable={!pendingTaskIds?.has?.(String(t.id))}
               onDragStart={(e) => onDragStart?.(e, t)}
-              className={cn(draggingId === t.id ? "opacity-60" : null)}
+              className={cn(
+                draggingId === t.id ? "opacity-60" : null,
+                pendingTaskIds?.has?.(String(t.id)) ? "cursor-wait opacity-70" : null
+              )}
               onClick={() => onEditTask?.(t)}
             />
           ))
@@ -66,4 +71,3 @@ export function KanbanColumn({
     </div>
   );
 }
-

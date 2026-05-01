@@ -5,6 +5,7 @@ export function TaskFilters({
   search,
   status,
   priority,
+  searchInputRef,
   onSearchChange,
   onStatusChange,
   onPriorityChange
@@ -12,6 +13,7 @@ export function TaskFilters({
   return (
     <div className="grid gap-3 md:grid-cols-4">
       <Input
+        ref={searchInputRef}
         label="Search"
         placeholder="Search tasks…"
         value={search}
@@ -47,4 +49,3 @@ export function TaskFilters({
     </div>
   );
 }
-

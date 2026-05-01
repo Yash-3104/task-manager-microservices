@@ -1,14 +1,12 @@
 import { useMemo, useState } from "react";
-import { Badge } from "../../../components/ui/Badge.jsx";
 import { Button } from "../../../components/ui/Button.jsx";
 import { Card } from "../../../components/ui/Card.jsx";
 import { Input } from "../../../components/ui/Input.jsx";
 import { Spinner } from "../../../components/ui/Spinner.jsx";
 import {
-  PRIORITY_COLORS,
   PRIORITY_LABELS,
-  STATUS_COLORS,
   STATUS_LABELS,
+  TASK_PRIORITIES,
   TASK_STATUSES
 } from "../../../utils/constants.js";
 import { cn, formatDate, isOverdue } from "../../../utils/helpers.js";
@@ -29,12 +27,15 @@ function TableSkeleton() {
 export function TaskTable({
   tasks,
   loading,
-  statusUpdatingIds,
+  pendingTaskIds,
   onEditTask,
   onDeleteTask,
+  onUpdateTask,
   onUpdateStatus
 }) {
   const [page, setPage] = useState(1);
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [titleDraft, setTitleDraft] = useState("");
   const pageSize = 10;
 
   const role = localStorage.getItem("tm_role");
@@ -50,12 +51,32 @@ export function TaskTable({
   }, [tasks, safePage]);
 
   function go(delta) {
-    setPage((p) => {
-      const next = p + delta;
-      if (next < 1) return 1;
-      if (next > totalPages) return totalPages;
-      return next;
-    });
+    setPage((value) => Math.min(Math.max(value + delta, 1), totalPages));
+  }
+
+  function startTitleEdit(task) {
+    setEditingTitleId(task.id);
+    setTitleDraft(task.title || "");
+  }
+
+  function cancelTitleEdit() {
+    setEditingTitleId(null);
+    setTitleDraft("");
+  }
+
+  async function saveTitle(task) {
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === task.title) {
+      cancelTitleEdit();
+      return;
+    }
+
+    try {
+      await onUpdateTask?.(task, { title: nextTitle });
+      cancelTitleEdit();
+    } catch {
+      return;
+    }
   }
 
   return (
@@ -66,7 +87,7 @@ export function TaskTable({
             Tasks
           </div>
           <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Inline status updates, quick edits, and clean pagination.
+            Click a title, status, or priority to update it inline.
           </div>
         </div>
 
@@ -79,7 +100,7 @@ export function TaskTable({
         {loading ? (
           <TableSkeleton />
         ) : tasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+          <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
             No tasks match your filters.
           </div>
         ) : (
@@ -97,18 +118,48 @@ export function TaskTable({
             <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800/70">
               {pageItems.map((task) => {
                 const overdue = isOverdue(task);
-                const updating = statusUpdatingIds?.has?.(task.id);
-                const statusColor = STATUS_COLORS[task.status] ?? "slate";
-                const priorityColor = PRIORITY_COLORS[task.priority] ?? "slate";
+                const pending = pendingTaskIds?.has?.(String(task.id));
                 const canEdit = isAdmin || task.assignedUsername === username;
                 const canDelete = isAdmin;
+                const isTitleEditing = editingTitleId === task.id;
 
                 return (
                   <tr key={task.id} className="align-top">
                     <td className="py-4 pr-4">
-                      <div className="font-semibold text-slate-900 dark:text-white">
-                        {task.title || "Untitled"}
-                      </div>
+                      {isTitleEditing ? (
+                        <form
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            saveTitle(task);
+                          }}
+                        >
+                          <Input
+                            autoFocus
+                            value={titleDraft}
+                            onChange={(event) => setTitleDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") cancelTitleEdit();
+                            }}
+                            disabled={pending}
+                            className="py-1.5"
+                            containerClassName="space-y-0"
+                          />
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          className={cn(
+                            "block max-w-[360px] truncate text-left font-semibold text-slate-900",
+                            "hover:text-slate-700 disabled:cursor-not-allowed disabled:hover:text-slate-900",
+                            "dark:text-white dark:hover:text-slate-200 dark:disabled:hover:text-white"
+                          )}
+                          onClick={() => startTitleEdit(task)}
+                          disabled={!canEdit || pending}
+                          title={canEdit ? "Click to edit title" : undefined}
+                        >
+                          {task.title || "Untitled"}
+                        </button>
+                      )}
 
                       {task.description ? (
                         <div className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
@@ -124,37 +175,50 @@ export function TaskTable({
                     </td>
 
                     <td className="py-4 pr-4">
-                      <Badge color={priorityColor}>
-                        {PRIORITY_LABELS[task.priority] ?? task.priority}
-                      </Badge>
+                      <Input
+                        as="select"
+                        value={task.priority}
+                        onChange={(event) =>
+                          Promise.resolve(
+                            onUpdateTask?.(task, { priority: event.target.value })
+                          ).catch(() => {})
+                        }
+                        disabled={!canEdit || pending}
+                        className="min-w-[120px] py-1.5"
+                        containerClassName="space-y-0"
+                        aria-label={`Priority for ${task.title || "task"}`}
+                      >
+                        {TASK_PRIORITIES.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {PRIORITY_LABELS[priority] ?? priority}
+                          </option>
+                        ))}
+                      </Input>
                     </td>
 
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-2">
-                        <Badge color={statusColor}>
-                          {STATUS_LABELS[task.status] ?? task.status}
-                        </Badge>
+                        <Input
+                          as="select"
+                          value={task.status}
+                          onChange={(event) =>
+                            Promise.resolve(onUpdateStatus?.(task, event.target.value)).catch(
+                              () => {}
+                            )
+                          }
+                          disabled={!canEdit || pending}
+                          className="min-w-[150px] py-1.5"
+                          containerClassName="space-y-0"
+                          aria-label={`Status for ${task.title || "task"}`}
+                        >
+                          {TASK_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                              {STATUS_LABELS[status] ?? status}
+                            </option>
+                          ))}
+                        </Input>
 
-                        <div className="min-w-[160px]">
-                          <Input
-                            as="select"
-                            value={task.status}
-                            onChange={(e) =>
-                              onUpdateStatus?.(task, e.target.value)
-                            }
-                            disabled={!canEdit || updating}
-                            className="py-1"
-                            containerClassName="space-y-0"
-                          >
-                            {TASK_STATUSES.map((status) => (
-                              <option key={status} value={status}>
-                                {status}
-                              </option>
-                            ))}
-                          </Input>
-                        </div>
-
-                        {updating ? <Spinner className="h-4 w-4" /> : null}
+                        {pending ? <Spinner className="h-4 w-4" /> : null}
                       </div>
                     </td>
 
@@ -182,6 +246,7 @@ export function TaskTable({
                           <Button
                             variant="secondary"
                             onClick={() => onEditTask?.(task)}
+                            disabled={pending}
                           >
                             Edit
                           </Button>
@@ -191,6 +256,7 @@ export function TaskTable({
                           <Button
                             variant="danger"
                             onClick={() => onDeleteTask?.(task)}
+                            disabled={pending}
                           >
                             Delete
                           </Button>

@@ -1,6 +1,7 @@
+import { forwardRef } from "react";
 import { cn } from "../../utils/helpers.js";
 
-export function Input({
+export const Input = forwardRef(function Input({
   label,
   hint,
   error,
@@ -8,7 +9,7 @@ export function Input({
   containerClassName,
   as = "input",
   ...props
-}) {
+}, ref) {
   const Comp = as;
   const describedBy = hint ? `${props.id || props.name || "field"}_hint` : undefined;
 
@@ -30,6 +31,7 @@ export function Input({
         )}
         aria-invalid={Boolean(error) || undefined}
         aria-describedby={describedBy}
+        ref={ref}
         {...props}
       />
       {hint ? (
@@ -40,5 +42,4 @@ export function Input({
       {error ? <div className="text-xs text-rose-600 dark:text-rose-200">{error}</div> : null}
     </div>
   );
-}
-
+});

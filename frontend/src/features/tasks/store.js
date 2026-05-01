@@ -11,24 +11,97 @@ function normalizeList(data) {
   return [];
 }
 
+const ACTIVITY_LIMIT = 8;
+
+function taskSignature(task) {
+  return JSON.stringify({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    startDate: task.startDate,
+    dueDate: task.dueDate,
+    assignedUsername: task.assignedUsername,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt
+  });
+}
+
+function reconcileTasks(current, incoming) {
+  let changed = current.length !== incoming.length;
+  const currentById = new Map(current.map((task) => [String(task.id), task]));
+
+  const next = incoming.map((task, index) => {
+    const existing = currentById.get(String(task.id));
+    if (!existing) {
+      changed = true;
+      return task;
+    }
+
+    if (current[index]?.id !== existing.id) changed = true;
+    if (taskSignature(existing) === taskSignature(task)) return existing;
+
+    changed = true;
+    return task;
+  });
+
+  return changed ? next : current;
+}
+
+function activity(type, task, meta = {}) {
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    type,
+    taskId: task?.id,
+    title: task?.title || "Untitled task",
+    createdAt: new Date().toISOString(),
+    ...meta
+  };
+}
+
+function withPendingId(pendingTaskIds, id, shouldAdd) {
+  const next = new Set(pendingTaskIds);
+  const key = String(id);
+  if (shouldAdd) next.add(key);
+  else next.delete(key);
+  return next;
+}
+
 export const useTasksStore = create((set, get) => ({
   tasks: [],
   loading: false,
+  refreshing: false,
   error: "",
+  pendingTaskIds: new Set(),
+  activityLog: [],
   dashboard: null,
   dashboardLoading: false,
 
-  fetchTasks: async () => {
-    set({ loading: true, error: "" });
+  addActivity: (entry) => {
+    set((state) => ({
+      activityLog: [entry, ...state.activityLog].slice(0, ACTIVITY_LIMIT)
+    }));
+  },
+
+  fetchTasks: async (options = {}) => {
+    const background = Boolean(options.background);
+    const silent = Boolean(options.silent);
+    set(background ? { refreshing: true } : { loading: true, error: "" });
     try {
       const data = await tasksApi.fetchTasks();
-      set({ tasks: normalizeList(data) });
+      const incoming = normalizeList(data);
+      set((state) => ({
+        tasks: reconcileTasks(state.tasks, incoming),
+        error: ""
+      }));
     } catch (err) {
       const msg = getApiErrorMessage(err);
       set({ error: msg });
+      if (!silent) toast.error(msg);
       throw err;
     } finally {
-      set({ loading: false });
+      set(background ? { refreshing: false } : { loading: false });
     }
   },
 
@@ -47,47 +120,89 @@ export const useTasksStore = create((set, get) => ({
   createTask: async (payload) => {
     const tempId = `tmp_${Date.now()}`;
     const optimistic = normalizeTask({ id: tempId, ...payload });
-    set((s) => ({ tasks: [optimistic, ...s.tasks] }));
+    const snapshot = get().tasks;
+    set((state) => ({
+      tasks: [optimistic, ...state.tasks],
+      pendingTaskIds: withPendingId(state.pendingTaskIds, tempId, true)
+    }));
     try {
       const created = normalizeTask(await tasksApi.createTask(payload));
-      set((s) => ({ tasks: s.tasks.map((t) => (t.id === tempId ? created : t)) }));
+      set((state) => ({
+        tasks: state.tasks.map((task) => (task.id === tempId ? created : task)),
+        pendingTaskIds: withPendingId(state.pendingTaskIds, tempId, false),
+        activityLog: [activity("created", created), ...state.activityLog].slice(0, ACTIVITY_LIMIT)
+      }));
       toast.success("Task created.");
       return created;
     } catch (err) {
       const msg = getApiErrorMessage(err);
-      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== tempId) }));
+      set((state) => ({
+        tasks: snapshot,
+        pendingTaskIds: withPendingId(state.pendingTaskIds, tempId, false)
+      }));
       toast.error(msg);
       throw err;
     }
   },
 
   updateTask: async (id, patch, options) => {
-    const prev = get().tasks.find((t) => t.id === id);
+    const idKey = String(id);
+    const prev = get().tasks.find((task) => String(task.id) === idKey);
     if (!prev) return null;
+    const snapshot = get().tasks;
     const next = { ...prev, ...patch };
-    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? next : t)) }));
+    set((state) => ({
+      tasks: state.tasks.map((task) => (String(task.id) === idKey ? next : task)),
+      pendingTaskIds: withPendingId(state.pendingTaskIds, id, true)
+    }));
     try {
       const updated = normalizeTask(await tasksApi.updateTask(id, patch));
-      set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+      const type = patch.status && patch.status !== prev.status ? "status" : "updated";
+      set((state) => ({
+        tasks: state.tasks.map((task) => (String(task.id) === idKey ? updated : task)),
+        pendingTaskIds: withPendingId(state.pendingTaskIds, id, false),
+        activityLog: [
+          activity(type, updated, {
+            fromStatus: type === "status" ? prev.status : undefined,
+            toStatus: type === "status" ? updated.status : undefined
+          }),
+          ...state.activityLog
+        ].slice(0, ACTIVITY_LIMIT)
+      }));
       if (!options?.silent) toast.success("Task updated.");
       return updated;
     } catch (err) {
       const msg = getApiErrorMessage(err);
-      set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? prev : t)) }));
+      set((state) => ({
+        tasks: snapshot,
+        pendingTaskIds: withPendingId(state.pendingTaskIds, id, false)
+      }));
       toast.error(msg);
       throw err;
     }
   },
 
   deleteTask: async (id) => {
+    const idKey = String(id);
     const prev = get().tasks;
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+    const removed = prev.find((task) => String(task.id) === idKey);
+    set((state) => ({
+      tasks: state.tasks.filter((task) => String(task.id) !== idKey),
+      pendingTaskIds: withPendingId(state.pendingTaskIds, id, true)
+    }));
     try {
       await tasksApi.deleteTask(id);
+      set((state) => ({
+        pendingTaskIds: withPendingId(state.pendingTaskIds, id, false),
+        activityLog: [activity("deleted", removed), ...state.activityLog].slice(0, ACTIVITY_LIMIT)
+      }));
       toast.success("Task deleted.");
     } catch (err) {
       const msg = getApiErrorMessage(err);
-      set({ tasks: prev });
+      set((state) => ({
+        tasks: prev,
+        pendingTaskIds: withPendingId(state.pendingTaskIds, id, false)
+      }));
       toast.error(msg);
       throw err;
     }

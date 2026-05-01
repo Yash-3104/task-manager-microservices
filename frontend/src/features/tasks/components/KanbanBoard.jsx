@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { TASK_STATUSES } from "../../../utils/constants.js";
 import { KanbanColumn } from "./KanbanColumn.jsx";
 
-export function KanbanBoard({ tasks, onMoveTask, onEditTask }) {
+export function KanbanBoard({ tasks, pendingTaskIds, onMoveTask, onEditTask }) {
   const [draggingId, setDraggingId] = useState(null);
 
   const byStatus = useMemo(() => {
@@ -15,6 +15,7 @@ export function KanbanBoard({ tasks, onMoveTask, onEditTask }) {
   }, [tasks]);
 
   function onDragStart(e, task) {
+    if (pendingTaskIds?.has?.(String(task.id))) return;
     setDraggingId(task.id);
     e.dataTransfer.setData("text/taskId", String(task.id));
     e.dataTransfer.setData("text/fromStatus", String(task.status));
@@ -23,8 +24,16 @@ export function KanbanBoard({ tasks, onMoveTask, onEditTask }) {
 
   function onDropTask({ taskId, toStatus }) {
     setDraggingId(null);
-    onMoveTask?.(taskId, { status: toStatus });
-  }
+    if (pendingTaskIds?.has?.(String(taskId))) return;
+    const task = tasks.find(t => String(t.id) === String(taskId));
+
+   if (!task) return;
+
+   onMoveTask?.(taskId, {
+   ...task,
+   status: toStatus
+  });
+}
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -37,9 +46,9 @@ export function KanbanBoard({ tasks, onMoveTask, onEditTask }) {
           onDropTask={onDropTask}
           onEditTask={onEditTask}
           onDragStart={onDragStart}
+          pendingTaskIds={pendingTaskIds}
         />
       ))}
     </div>
   );
 }
-

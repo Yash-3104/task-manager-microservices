@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Button } from "../components/ui/Button.jsx";
 import { Card } from "../components/ui/Card.jsx";
@@ -8,6 +8,7 @@ import { TaskFilters } from "../features/tasks/components/TaskFilters.jsx";
 import { TaskForm } from "../features/tasks/components/TaskForm.jsx";
 import { TaskTable } from "../features/tasks/components/TaskTable.jsx";
 import { KanbanBoard } from "../features/tasks/components/KanbanBoard.jsx";
+import { ActivityFeed } from "../features/tasks/components/ActivityFeed.jsx";
 import { PRIORITY_LABELS, STATUS_LABELS, TASK_PRIORITIES, TASK_STATUSES } from "../utils/constants.js";
 import { cn, isOverdue } from "../utils/helpers.js";
 import { useTasks } from "../hooks/useTasks.js";
@@ -56,6 +57,8 @@ function ChartCard({ title, subtitle, children }) {
 export function Dashboard() {
   const tasks = useTasks((s) => s.tasks);
   const loading = useTasks((s) => s.loading);
+  const pendingTaskIds = useTasks((s) => s.pendingTaskIds);
+  const activityLog = useTasks((s) => s.activityLog);
   const error = useTasks((s) => s.error);
   const fetchTasks = useTasks((s) => s.fetchTasks);
   const createTask = useTasks((s) => s.createTask);
@@ -68,11 +71,67 @@ export function Dashboard() {
   const [editingTask, setEditingTask] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [statusUpdatingIds, setStatusUpdatingIds] = useState(() => new Set());
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     fetchTasks().catch(() => {});
   }, [fetchTasks]);
+
+  useEffect(() => {
+    function pollTasks() {
+      if (document.visibilityState !== "visible") return;
+      fetchTasks({ background: true, silent: true }).catch(() => {});
+    }
+
+    const intervalId = window.setInterval(pollTasks, 7000);
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") pollTasks();
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [fetchTasks]);
+
+  useEffect(() => {
+    function isTypingTarget(target) {
+      const tagName = target?.tagName?.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target?.isContentEditable
+      );
+    }
+
+    function onKeyDown(event) {
+      if (isTypingTarget(event.target)) return;
+
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setEditingTask(null);
+        setShowForm(true);
+      }
+
+      if (event.key === "/") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      if (event.key === "Escape") {
+        setShowForm(false);
+        setEditingTask(null);
+        setDeleteConfirm(null);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -88,8 +147,8 @@ export function Dashboard() {
     const total = tasks.length;
     const completed = tasks.filter((t) => t.status === "DONE").length;
     const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
-    const overdue = tasks.filter((t) => isOverdue(t)).length;
-    return { total, completed, inProgress, overdue };
+    const todo = tasks.filter((t) => t.status === "TODO").length;
+    return { total, completed, inProgress, todo };
   }, [tasks]);
 
   const byStatus = useMemo(
@@ -124,29 +183,28 @@ export function Dashboard() {
     }
   }
 
+  async function onUpdateTask(task, patch) {
+    await updateTask(task.id, patch, { silent: true });
+  }
+
   async function onUpdateStatus(task, nextStatus) {
     if (task.status === nextStatus) return;
-    setStatusUpdatingIds((prev) => new Set(prev).add(task.id));
-    try {
-      await updateTask(task.id, { status: nextStatus }, { silent: true });
-    } finally {
-      setStatusUpdatingIds((prev) => {
-        const n = new Set(prev);
-        n.delete(task.id);
-        return n;
-      });
-    }
+    await onUpdateTask(task, { status: nextStatus });
   }
 
   async function onMoveTask(taskId, patch) {
-    await updateTask(taskId, patch, { silent: true });
+    try {
+      await updateTask(taskId, patch, { silent: true });
+    } catch {
+      return;
+    }
   }
 
   async function onConfirmDelete() {
     if (!deleteConfirm) return;
     const t = deleteConfirm;
     setDeleteConfirm(null);
-    await deleteTask(t.id);
+    await deleteTask(t.id).catch(() => {});
   }
 
   return (
@@ -177,10 +235,17 @@ export function Dashboard() {
 
       {error ? (
         <Card className="p-5">
-          <div className="text-sm font-semibold text-slate-900 dark:text-white">
-            Couldn’t load tasks
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                Couldn't load tasks
+              </div>
+              <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">{error}</div>
+            </div>
+            <Button variant="secondary" onClick={() => fetchTasks()} disabled={loading}>
+              Retry
+            </Button>
           </div>
-          <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">{error}</div>
         </Card>
       ) : null}
 
@@ -203,8 +268,8 @@ export function Dashboard() {
           icon={<span className="text-sm font-bold">↻</span>}
         />
         <StatCard
-          title="Overdue"
-          value={stats.overdue}
+          title="TODO"
+          value={stats.todo}
           tone="rose"
           icon={<span className="text-sm font-bold">!</span>}
         />
@@ -321,6 +386,7 @@ export function Dashboard() {
 
         <div className="mt-5">
           <TaskFilters
+            searchInputRef={searchInputRef}
             search={filters.search}
             status={filters.status}
             priority={filters.priority}
@@ -335,17 +401,19 @@ export function Dashboard() {
         <TaskTable
           tasks={filtered}
           loading={loading}
-          statusUpdatingIds={statusUpdatingIds}
+          pendingTaskIds={pendingTaskIds}
           onEditTask={(t) => {
             setEditingTask(t);
             setShowForm(true);
           }}
           onDeleteTask={(t) => setDeleteConfirm(t)}
+          onUpdateTask={onUpdateTask}
           onUpdateStatus={onUpdateStatus}
         />
       ) : (
         <KanbanBoard
           tasks={filtered}
+          pendingTaskIds={pendingTaskIds}
           onMoveTask={onMoveTask}
           onEditTask={(t) => {
             setEditingTask(t);
@@ -353,6 +421,8 @@ export function Dashboard() {
           }}
         />
       )}
+
+      <ActivityFeed items={activityLog} />
 
       <Modal
         open={showForm}
