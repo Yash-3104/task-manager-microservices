@@ -1,14 +1,15 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import Button from "../components/Button.jsx";
-import { clearAuthTokens } from "../services/api.js";
-import { useTheme } from "../hooks/useTheme.js";
+import { Button } from "../components/ui/Button.jsx";
+import { useTheme } from "../app/providers.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 
-export default function AppLayout() {
+export function AppLayout() {
   const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
+  const { theme, toggleTheme } = useTheme();
+  const logout = useAuth((s) => s.logout);
 
-  function logout() {
-    clearAuthTokens();
+  function onLogout() {
+    logout();
     navigate("/login", { replace: true });
   }
 
@@ -44,10 +45,10 @@ export default function AppLayout() {
             >
               Overview
             </NavLink>
-            <Button variant="ghost" onClick={toggle}>
-              {theme === "dark" ? "Light" : "Dark"}
+            <Button variant="ghost" onClick={toggleTheme}>
+              {theme === "dark" ? "Light mode" : "Dark mode"}
             </Button>
-            <Button variant="secondary" onClick={logout}>
+            <Button variant="secondary" onClick={onLogout}>
               Logout
             </Button>
           </nav>
@@ -60,4 +61,3 @@ export default function AppLayout() {
     </div>
   );
 }
-

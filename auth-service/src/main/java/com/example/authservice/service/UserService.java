@@ -68,6 +68,7 @@ public class UserService {
         LoginResponse response = new LoginResponse();
         response.setAccessToken(accessToken);
         response.setRefreshToken(refreshToken);
+        response.setRole(user.getRole().name());
 
         return response;
     }

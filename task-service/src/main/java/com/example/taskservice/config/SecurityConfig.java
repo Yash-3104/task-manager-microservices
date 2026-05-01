@@ -19,6 +19,7 @@ public class SecurityConfig {
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable())) // 
 	        .authorizeHttpRequests(auth -> auth
 	            .requestMatchers("/h2-console/**").permitAll()  // 
+				.requestMatchers("/api/tasks/**").authenticated()
 	            .anyRequest().authenticated()
 	        )
 	        .addFilterBefore(new JwtFilter(jwtUtil),

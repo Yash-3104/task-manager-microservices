@@ -1,9 +1,11 @@
-export default function Spinner({ className = "h-5 w-5" }) {
+import { cn } from "../../utils/helpers.js";
+
+export function Spinner({ className }) {
   return (
     <svg
-      className={`animate-spin ${className}`}
+      className={cn("h-5 w-5 animate-spin text-slate-600 dark:text-slate-300", className)}
       viewBox="0 0 24 24"
-      aria-hidden="true"
+      fill="none"
     >
       <circle
         className="opacity-25"
@@ -12,7 +14,6 @@ export default function Spinner({ className = "h-5 w-5" }) {
         r="10"
         stroke="currentColor"
         strokeWidth="4"
-        fill="none"
       />
       <path
         className="opacity-75"

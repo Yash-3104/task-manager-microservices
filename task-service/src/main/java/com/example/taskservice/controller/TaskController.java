@@ -49,7 +49,10 @@ public class TaskController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth.getName();
 
-        service.deleteTask(id, username);
+        boolean isAdmin = auth.getAuthorities().stream()
+        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        service.deleteTask(id, username, isAdmin);
     }
     @GetMapping("/dashboard")
     public DashboardResponse dashboard() {
@@ -61,4 +64,14 @@ public class TaskController {
 
         return service.getDashboard(username, isAdmin);
     }
-}
+    @PutMapping("/{id}")
+    public Task update(@PathVariable Long id, @RequestBody Task updatedTask) {
+
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    String username = auth.getName();
+    boolean isAdmin = auth.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+    return service.updateTask(id, updatedTask, username, isAdmin);
+    }
+ }

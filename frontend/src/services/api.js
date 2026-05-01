@@ -1,40 +1,38 @@
 import axios from "axios";
 
-const BASE_URL = "http://13.205.146.153";
+export const BASE_URL = "http://13.205.146.153";
 
-const STORAGE_KEYS = {
-  accessToken: "tm_access_token",
-  refreshToken: "tm_refresh_token"
+export const STORAGE_KEYS = {
+  accessToken: "tm_access_token"
 };
 
 export function getAccessToken() {
   return localStorage.getItem(STORAGE_KEYS.accessToken);
 }
 
-export function setAuthTokens({ accessToken, refreshToken }) {
-  if (accessToken) localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
-  if (refreshToken) localStorage.setItem(STORAGE_KEYS.refreshToken, refreshToken);
+export function setAccessToken(token) {
+  if (!token) return;
+  localStorage.setItem(STORAGE_KEYS.accessToken, token);
 }
 
-export function clearAuthTokens() {
+export function clearAccessToken() {
   localStorage.removeItem(STORAGE_KEYS.accessToken);
-  localStorage.removeItem(STORAGE_KEYS.refreshToken);
 }
 
-export function getJwtPayload(token) {
-  try {
-    const payloadPart = token.split(".")[1];
-    if (!payloadPart) return null;
-    const decoded = atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+export function getApiErrorMessage(error) {
+  if (!error) return "Something went wrong.";
+  const maybeMessage =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.response?.data?.details ||
+    error?.message;
+  if (typeof maybeMessage === "string") return maybeMessage;
+  return "Something went wrong.";
 }
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000
+  timeout: 20000
 });
 
 api.interceptors.request.use((config) => {
@@ -45,15 +43,4 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
-
-export function getApiErrorMessage(error) {
-  if (!error) return "Something went wrong.";
-  const maybeMessage =
-    error?.response?.data?.message ||
-    error?.response?.data?.error ||
-    error?.response?.data ||
-    error?.message;
-  if (typeof maybeMessage === "string") return maybeMessage;
-  return "Something went wrong.";
-}
 

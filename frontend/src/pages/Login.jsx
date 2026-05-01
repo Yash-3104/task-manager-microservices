@@ -1,18 +1,24 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import Card from "../components/Card.jsx";
-import Input from "../components/Input.jsx";
-import Button from "../components/Button.jsx";
-import { api, getApiErrorMessage, setAuthTokens } from "../services/api.js";
+import { Card } from "../components/ui/Card.jsx";
+import { Input } from "../components/ui/Input.jsx";
+import { Button } from "../components/ui/Button.jsx";
+import { getApiErrorMessage } from "../services/api.js";
+import * as authApi from "../features/auth/api.js";
+import { useAuth } from "../hooks/useAuth.js";
 
-export default function Login() {
+export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const setSession = useAuth((s) => s.setSession);
 
-  const redirectTo = useMemo(() => location.state?.from || "/dashboard", [location]);
+  const redirectTo = useMemo(
+    () => location.state?.from || "/dashboard",
+    [location]
+  );
 
-  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -23,17 +29,26 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      const res = await api.post("/api/auth/login", {
-        username: emailOrUsername,
+      const { accessToken, refreshToken, role } = await authApi.login({
+        username,
         password
       });
 
-      const accessToken = res?.data?.accessToken ?? res?.data?.token ?? res?.data?.access_token;
-      const refreshToken = res?.data?.refreshToken ?? res?.data?.refresh_token;
+      if (!accessToken) {
+        throw new Error("Login succeeded but token was not returned.");
+      }
 
-      if (!accessToken) throw new Error("Login succeeded but token was not returned.");
+      if (!role) {
+        throw new Error("Login succeeded but role was not returned.");
+      }
 
-      setAuthTokens({ accessToken, refreshToken });
+      setSession({
+        accessToken,
+        refreshToken,
+        role,
+        username
+      });
+
       toast.success("Welcome back!");
       navigate(redirectTo, { replace: true });
     } catch (err) {
@@ -46,27 +61,27 @@ export default function Login() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md">
+    <Card className="mx-auto w-full max-w-md p-6">
       <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
         Sign in
       </h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        Use your username (or email) and password.
+        Use your username and password.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Input
-          label="Email / Username"
-          placeholder="you@example.com"
-          value={emailOrUsername}
-          onChange={(e) => setEmailOrUsername(e.target.value)}
+          label="Username"
+          placeholder="yourname"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
           required
         />
+
         <Input
           label="Password"
           type="password"
-          placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"

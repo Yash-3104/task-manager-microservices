@@ -5,6 +5,8 @@ import com.example.taskservice.model.*;
 import com.example.taskservice.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.util.List;
 import org.springframework.cache.annotation.CacheEvict;
 
@@ -34,15 +36,16 @@ public class TaskService {
 
     // ✅ DELETE TASK (invalidate cache)
     @CacheEvict(value = "dashboard", key = "#username")
-    public void deleteTask(Long id, String username) {
-        Task task = repo.findById(id).orElseThrow();
+    public void deleteTask(Long id, String username, boolean isAdmin) {
 
-        if (!task.getAssignedUsername().equals(username)) {
-            throw new RuntimeException("Not allowed");
-        }
+    Task task = repo.findById(id).orElseThrow();
 
-        repo.delete(task);
+    if (!isAdmin && !task.getAssignedUsername().equals(username)) {
+        throw new RuntimeException("Not allowed");
     }
+
+    repo.delete(task);
+}
 
     // ✅ CACHE READ
     @Cacheable(value = "dashboard", key = "#username")
@@ -67,4 +70,23 @@ public class TaskService {
 
         return res;
     }
-}
+    @CacheEvict(value = "dashboard", key = "#username")
+    public Task updateTask(Long id, Task updatedTask, String username, boolean isAdmin) {
+
+    Task existing = repo.findById(id).orElseThrow();
+
+    // 🔥 USER can edit only own tasks
+    if (!isAdmin && !existing.getAssignedUsername().equals(username)) {
+        throw new RuntimeException("Not allowed");
+    }
+
+    // update fields
+    existing.setTitle(updatedTask.getTitle());
+    existing.setDescription(updatedTask.getDescription());
+    existing.setStatus(updatedTask.getStatus());
+    existing.setPriority(updatedTask.getPriority());
+    existing.setDueDate(updatedTask.getDueDate());
+
+    return repo.save(existing);
+    }
+ }

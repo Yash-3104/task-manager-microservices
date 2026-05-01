@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import Card from "../components/Card.jsx";
-import Input from "../components/Input.jsx";
-import Select from "../components/Select.jsx";
-import Button from "../components/Button.jsx";
-import { api, getApiErrorMessage } from "../services/api.js";
+import { Card } from "../components/ui/Card.jsx";
+import { Input } from "../components/ui/Input.jsx";
+import { Button } from "../components/ui/Button.jsx";
+import { getApiErrorMessage } from "../services/api.js";
+import * as authApi from "../features/auth/api.js";
 
-export default function Register() {
+export function Register() {
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
@@ -20,9 +20,8 @@ export default function Register() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
-
     try {
-      await api.post("/api/auth/register", { username, password, role });
+      await authApi.register({ username, password, role });
       toast.success("Account created. Please sign in.");
       navigate("/login", { replace: true });
     } catch (err) {
@@ -35,12 +34,12 @@ export default function Register() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md">
+    <Card className="mx-auto w-full max-w-md p-6">
       <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
         Create account
       </h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        Choose a username, set a password, and pick a role.
+        Create a new account to start managing tasks.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -55,16 +54,15 @@ export default function Register() {
         <Input
           label="Password"
           type="password"
-          placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"
           required
         />
-        <Select label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
+        <Input as="select" label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="USER">USER</option>
           <option value="ADMIN">ADMIN</option>
-        </Select>
+        </Input>
 
         {error ? (
           <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:ring-rose-900">
