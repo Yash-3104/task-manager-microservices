@@ -10,9 +10,13 @@ import * as authApi from "../features/auth/api.js";
 export function Register() {
   const navigate = useNavigate();
 
+  //  check current logged-in role
+  const currentRole = localStorage.getItem("tm_role");
+  const isAdmin = currentRole === "ADMIN" || currentRole === "ROLE_ADMIN";
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("USER");
+  const [role, setRole] = useState("USER"); // default USER
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,8 +24,14 @@ export function Register() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+
     try {
-      await authApi.register({ username, password, role });
+      await authApi.register({
+        username,
+        password,
+        role: isAdmin ? role : "USER" // 🔥 enforce USER if not admin
+      });
+
       toast.success("Account created. Please sign in.");
       navigate("/login", { replace: true });
     } catch (err) {
@@ -38,6 +48,7 @@ export function Register() {
       <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
         Create account
       </h2>
+
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         Create a new account to start managing tasks.
       </p>
@@ -51,6 +62,7 @@ export function Register() {
           autoComplete="username"
           required
         />
+
         <Input
           label="Password"
           type="password"
@@ -59,10 +71,19 @@ export function Register() {
           autoComplete="new-password"
           required
         />
-        <Input as="select" label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="USER">USER</option>
-          <option value="ADMIN">ADMIN</option>
-        </Input>
+
+        {/*  Only ADMIN can see role selection */}
+        {isAdmin && (
+          <Input
+            as="select"
+            label="Role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          >
+            <option value="USER">USER</option>
+            <option value="ADMIN">ADMIN</option>
+          </Input>
+        )}
 
         {error ? (
           <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:ring-rose-900">
@@ -87,4 +108,3 @@ export function Register() {
     </Card>
   );
 }
-

@@ -24,7 +24,10 @@ public class TaskController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth.getName();  // ✅ correct way
 
-        return service.createTask(task, username);
+        boolean isAdmin = auth.getAuthorities().stream()
+        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        return service.createTask(task, username, isAdmin);
     }
 
     @GetMapping

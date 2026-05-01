@@ -21,8 +21,12 @@ public class TaskService {
 
     // ✅ CREATE TASK (invalidate cache)
     @CacheEvict(value = "dashboard", key = "#username")
-    public Task createTask(Task task, String username) {
+    public Task createTask(Task task, String username , boolean isAdmin) {
+        if (isAdmin && task.getAssignedUsername() != null && !task.getAssignedUsername().isBlank()) {
+        // keep assigned user
+        } else {
         task.setAssignedUsername(username);
+    }
         return repo.save(task);
     }
 
